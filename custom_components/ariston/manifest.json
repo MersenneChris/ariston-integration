@@ -10,6 +10,5 @@
   "issue_tracker": "https://github.com/MersenneChris/ariston-integration/issues",
   "name": "Ariston",
   "requirements": [],
-  "version": "1.0.0",
-  "zeroconf": []
+  "version": "1.0.0"
 }
