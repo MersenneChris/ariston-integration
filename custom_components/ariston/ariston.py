@@ -532,7 +532,7 @@ class AristonHandler:
         Logging settings
         """
         self._logging_level = logging.getLevelName(logging_level)
-        self._LOGGER.setLevel(self._LEVEL_NOTSET)
+        self._LOGGER.setLevel(self._logging_level)
         self._console_handler = logging.StreamHandler()
         self._console_handler.setLevel(self._logging_level)
         self._formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
