@@ -1,26 +1,16 @@
-"""Suppoort for Ariston."""
+"""Support for Ariston."""
 import logging
 import re
 
-import homeassistant.helpers.config_validation as cv
-import voluptuous as vol
-from homeassistant.components.binary_sensor import DOMAIN as BINARY_SENSOR
-from homeassistant.components.climate import DOMAIN as CLIMATE
-from homeassistant.components.sensor import DOMAIN as SENSOR
-from homeassistant.components.switch import DOMAIN as SWITCH
-from homeassistant.components.select import DOMAIN as SELECT
-from homeassistant.components.water_heater import DOMAIN as WATER_HEATER
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.const import (
     ATTR_ENTITY_ID,
-    CONF_BINARY_SENSORS,
     CONF_NAME,
     CONF_PASSWORD,
-    CONF_SENSORS,
-    CONF_SWITCHES,
-    CONF_SELECTOR,
     CONF_USERNAME,
+    Platform,
 )
-from homeassistant.helpers import discovery
 
 from .ariston import AristonHandler
 from .const import param_zoned
@@ -66,50 +56,183 @@ DEFAULT_PERIOD_SET = 30
 
 _LOGGER = logging.getLogger(__name__)
 
-ARISTON_SCHEMA = vol.Schema(
-    {
-        vol.Required(CONF_USERNAME): cv.string,
-        vol.Required(CONF_PASSWORD): cv.string,
-        vol.Optional(CONF_GW, default=""): cv.string,
-        vol.Optional(CONF_NAME, default=DEFAULT_NAME): cv.string,
-        vol.Optional(CONF_BINARY_SENSORS): vol.All(
-            cv.ensure_list, [vol.In(binary_sensors_default)]
-        ),
-        vol.Optional(CONF_SENSORS): vol.All(cv.ensure_list, [vol.In(sensors_default)]),
-
-        vol.Optional(CONF_MAX_SET_RETRIES, default=DEFAULT_MAX_RETRIES): vol.All(
-            int, vol.Range(min=1, max=10)
-        ),
-        vol.Optional(CONF_SWITCHES): vol.All(cv.ensure_list, [vol.In(switches_default)]),
-        vol.Optional(CONF_SELECTOR): vol.All(cv.ensure_list, [vol.In(selects_deafult)]),
-
-        vol.Optional(CONF_PERIOD_GET, default=DEFAULT_PERIOD_GET): vol.All(
-            int, vol.Range(min=30, max=3600)
-        ),
-        vol.Optional(CONF_PERIOD_SET, default=DEFAULT_PERIOD_SET): vol.All(
-            int, vol.Range(min=30, max=3600)
-        ),
-        vol.Optional(CONF_LOG, default="WARNING"): vol.In(
-            ["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"]
-        ),
-        vol.Optional(CONF_CH_ZONES, default=1): vol.All(
-            int, vol.Range(min=1, max=6)
-        ),
-
-    }
-)
+PLATFORMS = [
+    Platform.CLIMATE,
+    Platform.WATER_HEATER,
+    Platform.SENSOR,
+    Platform.BINARY_SENSOR,
+    Platform.SWITCH,
+    Platform.SELECT,
+]
 
 
-def _has_unique_names(devices):
-    names = [device[CONF_NAME] for device in devices]
-    vol.Schema(vol.Unique())(names)
-    return devices
+async def async_setup(hass: HomeAssistant, config: dict):
+    """Set up the Ariston component."""
+    hass.data.setdefault(DATA_ARISTON, {DEVICES: {}, CLIMATES: [], WATER_HEATERS: []})
+    return True
 
 
-CONFIG_SCHEMA = vol.Schema(
-    {DOMAIN: vol.All(cv.ensure_list, [ARISTON_SCHEMA], _has_unique_names)},
-    extra=vol.ALLOW_EXTRA,
-)
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
+    """Set up Ariston from a config entry."""
+    hass.data.setdefault(DATA_ARISTON, {DEVICES: {}, CLIMATES: [], WATER_HEATERS: []})
+    
+    name = entry.data.get(CONF_NAME, DEFAULT_NAME)
+    username = entry.data[CONF_USERNAME]
+    password = entry.data[CONF_PASSWORD]
+    gw = entry.data.get(CONF_GW, "")
+    
+    # Get options with defaults
+    options = entry.options
+    period_get = options.get(CONF_PERIOD_GET, DEFAULT_PERIOD_GET)
+    period_set = options.get(CONF_PERIOD_SET, DEFAULT_PERIOD_SET)
+    max_retries = options.get(CONF_MAX_SET_RETRIES, DEFAULT_MAX_RETRIES)
+    logging_level = options.get(CONF_LOG, "WARNING")
+    num_ch_zones = options.get(CONF_CH_ZONES, 1)
+    
+    # Use default sensors, binary_sensors, switches, and selectors for UI config
+    binary_sensors = list(binary_sensors_default)
+    sensors = list(sensors_default)
+    switches = list(switches_default)
+    selectors = list(selects_deafult)
+    
+    api = AristonChecker(
+        hass=hass,
+        device=entry.data,
+        name=name,
+        username=username,
+        password=password,
+        sensors=sensors,
+        binary_sensors=binary_sensors,
+        switches=switches,
+        selectors=selectors,
+        gw=gw,
+        logging=logging_level,
+        period_set=period_set,
+        period_get=period_get,
+        retries=max_retries
+    )
+    
+    # Start api execution
+    api.ariston_api.start()
+    
+    climates = []
+    for zone in range(1, num_ch_zones + 1):
+        climates.append(f'{name} Zone{zone}')
+    
+    def update_list(updated_list):
+        if updated_list:
+            if param in updated_list:
+                updated_list.remove(param)
+                for zone in range(1, num_ch_zones + 1):
+                    updated_list.append(param_zoned(param, zone))
+    
+    params_temp = set()
+    if sensors:
+        params_temp.update(sensors)
+    if binary_sensors:
+        params_temp.update(binary_sensors)
+    if switches:
+        params_temp.update(switches)
+    if selectors:
+        params_temp.update(selectors)
+    params = params_temp.intersection(ZONED_PARAMS)
+    for param in params:
+        update_list(switches)
+        update_list(binary_sensors)
+        update_list(sensors)
+        update_list(selectors)
+    
+    # Store device
+    hass.data[DATA_ARISTON][DEVICES][name] = AristonDevice(api, entry.data)
+    
+    # Forward entry setup to platforms
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    
+    # Register service
+    async def set_ariston_data(call: ServiceCall):
+        """Handle the service call to set the data."""
+        entity_id = call.data.get(ATTR_ENTITY_ID, "")
+
+        try:
+            domain = entity_id.split(".")[0]
+        except:
+            _LOGGER.warning("Invalid entity_id domain for Ariston")
+            raise Exception("Invalid entity_id domain for Ariston")
+        if domain.lower() not in {"climate", "water_heater"}:
+            _LOGGER.warning("Invalid entity_id domain for Ariston")
+            raise Exception("Invalid entity_id domain for Ariston")
+        try:
+            device_id = entity_id.split(".")[1]
+        except:
+            _LOGGER.warning("Invalid entity_id device for Ariston")
+            raise Exception("Invalid entity_id device for Ariston")
+
+        api_name = api.name.replace(' ', '_').lower()
+        if re.search(f'{api_name}_zone[1-9]$', device_id.lower()) or api_name == device_id.lower():
+            parameter_list = {}
+
+            params_to_set = {
+                PARAM_MODE,
+                PARAM_CH_MODE,
+                PARAM_CH_SET_TEMPERATURE,
+                PARAM_CH_AUTO_FUNCTION,
+                PARAM_CH_WATER_TEMPERATURE,
+                PARAM_DHW_SET_TEMPERATURE,
+                PARAM_DHW_COMFORT_FUNCTION,
+                PARAM_THERMAL_CLEANSE_CYCLE,
+                PARAM_THERMAL_CLEANSE_FUNCTION,
+                PARAM_INTERNET_TIME,
+                PARAM_INTERNET_WEATHER,
+            }
+            
+            set_zoned_params = []
+            for param in params_to_set:
+                if param in ZONED_PARAMS:
+                    for zone in range(1, 7):
+                        set_zoned_params.append(param_zoned(param, zone))
+                else:
+                    set_zoned_params.append(param)
+
+            for param in set_zoned_params:
+                data = call.data.get(param, "")
+                if data != "":
+                    parameter_list[param] = str(data)
+
+            _LOGGER.debug("Ariston device found, data to check and send")
+
+            await hass.async_add_executor_job(api.ariston_api.set_http_data, **parameter_list)
+            return
+        
+        raise Exception("Corresponding entity_id for Ariston not found")
+    
+    hass.services.async_register(DOMAIN, SERVICE_SET_DATA, set_ariston_data)
+    
+    # Register update listener for options
+    entry.async_on_unload(entry.add_update_listener(async_reload_entry))
+    
+    return True
+
+
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
+    """Unload a config entry."""
+    name = entry.data.get(CONF_NAME, DEFAULT_NAME)
+    
+    # Stop the API
+    if name in hass.data[DATA_ARISTON][DEVICES]:
+        device = hass.data[DATA_ARISTON][DEVICES][name]
+        device.api.ariston_api.stop()
+        hass.data[DATA_ARISTON][DEVICES].pop(name)
+    
+    # Unload platforms
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    
+    return unload_ok
+
+
+async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry):
+    """Reload config entry."""
+    await async_unload_entry(hass, entry)
+    await async_setup_entry(hass, entry)
 
 
 class AristonChecker:
@@ -166,189 +289,6 @@ class AristonChecker:
             period_get_request=period_get,
             period_set_request=period_set
         )
-
-
-def setup(hass, config):
-    """Set up the Ariston component."""
-    if DOMAIN not in config:
-        return True
-    hass.data.setdefault(DATA_ARISTON, {DEVICES: {}, CLIMATES: [], WATER_HEATERS: []})
-    api_list = []
-    dev_gateways = set()
-    dev_names = set()
-    for device in config[DOMAIN]:
-        name = device[CONF_NAME]
-        gw = device.get(CONF_GW)
-        username = device[CONF_USERNAME]
-        password = device[CONF_PASSWORD]
-        binary_sensors = device.get(CONF_BINARY_SENSORS)
-        sensors = device.get(CONF_SENSORS)
-        switches = device.get(CONF_SWITCHES)
-        selectors =  device.get(CONF_SELECTOR)
-        num_ch_zones = device.get(CONF_CH_ZONES)
-        if gw in dev_gateways:
-            _LOGGER.error(f"Duplicate value of 'gw': {gw}")
-            raise Exception(f"Duplicate value of 'gw': {gw}")
-        if name in dev_names:
-            _LOGGER.error(f"Duplicate value of 'name': {name}")
-            raise Exception(f"Duplicate value of 'name': {name}")
-        dev_gateways.add(gw)
-        dev_names.add(name)
-
-        api = AristonChecker(
-            hass=hass,
-            device=device,
-            name=name,
-            username=username,
-            password=password,
-            sensors=sensors,
-            binary_sensors=binary_sensors,
-            switches=switches,
-            selectors=selectors,
-            gw=gw,
-            logging=device.get(CONF_LOG),
-            period_set=device.get(CONF_PERIOD_SET),
-            period_get=device.get(CONF_PERIOD_GET),
-            retries=device.get(CONF_MAX_SET_RETRIES)
-        )
-
-        api_list.append(api)
-        # start api execution
-        api.ariston_api.start()
-
-        climates = []
-        for zone in range(1, num_ch_zones + 1):
-            climates.append(f'{name} Zone{zone}')
-        
-        def update_list(updated_list):
-            if updated_list:
-                if param in updated_list:
-                    updated_list.remove(param)
-                    for zone in range(1, num_ch_zones + 1):
-                        updated_list.append(param_zoned(param, zone))
-        params_temp = set()
-        if sensors:
-            params_temp.update(sensors)
-        if binary_sensors:
-            params_temp.update(binary_sensors)
-        if switches:
-            params_temp.update(switches)
-        if selectors:
-            params_temp.update(selectors)
-        params = params_temp.intersection(ZONED_PARAMS)
-        for param in params:
-            update_list(switches)
-            update_list(binary_sensors)
-            update_list(sensors)
-            update_list(selectors)
-
-        # load all devices
-        hass.data[DATA_ARISTON][DEVICES][name] = AristonDevice(api, device)
-        discovery.load_platform(hass, CLIMATE, DOMAIN, {CONF_NAME: name, CLIMATES: climates}, config)
-        discovery.load_platform(hass, WATER_HEATER, DOMAIN, {CONF_NAME: name}, config)
-
-        if switches:
-            discovery.load_platform(
-                hass,
-                SWITCH,
-                DOMAIN,
-                {CONF_NAME: name, CONF_SWITCHES: switches},
-                config,
-            )
-
-        if selectors:
-            discovery.load_platform(
-                hass,
-                SELECT,
-                DOMAIN,
-                {CONF_NAME: name, CONF_SELECTOR: selectors},
-                config,
-            )
-
-        if binary_sensors:
-            discovery.load_platform(
-                hass,
-                BINARY_SENSOR,
-                DOMAIN,
-                {CONF_NAME: name, CONF_BINARY_SENSORS: binary_sensors},
-                config,
-            )
-
-        if sensors:
-            discovery.load_platform(
-                hass, SENSOR, DOMAIN, {CONF_NAME: name, CONF_SENSORS: sensors}, config
-            )
-            
-    gateways_txt = ", ".join(dev_gateways)
-    names_txt = ", ".join(dev_names)
-    _LOGGER.info(f"All gateways: {gateways_txt}")
-    _LOGGER.info(f"All names: {names_txt}")
-
-    def set_ariston_data(call):
-        """Handle the service call to set the data."""
-        # Start with mandatory parameter
-        entity_id = call.data.get(ATTR_ENTITY_ID, "")
-
-        try:
-            domain = entity_id.split(".")[0]
-        except:
-            _LOGGER.warning("Invalid entity_id domain for Ariston")
-            raise Exception("Invalid entity_id domain for Ariston")
-        if domain.lower() not in {"climate", "water_heater"}:
-            _LOGGER.warning("Invalid entity_id domain for Ariston")
-            raise Exception("Invalid entity_id domain for Ariston")
-        try:
-            device_id = entity_id.split(".")[1]
-        except:
-            _LOGGER.warning("Invalid entity_id device for Ariston")
-            raise Exception("Invalid entity_id device for Ariston")
-
-        for api in api_list:
-            api_name = api.name.replace(' ', '_').lower()
-            if re.search(f'{api_name}_zone[1-9]$', device_id.lower()) or api_name == device_id.lower():
-                # climate entity is found
-                parameter_list = {}
-
-                params_to_set = {
-                    PARAM_MODE,
-                    PARAM_CH_MODE,
-                    PARAM_CH_SET_TEMPERATURE,
-                    PARAM_CH_AUTO_FUNCTION,
-                    PARAM_CH_WATER_TEMPERATURE,
-                    PARAM_DHW_SET_TEMPERATURE,
-                    PARAM_DHW_COMFORT_FUNCTION,
-                    PARAM_THERMAL_CLEANSE_CYCLE,
-                    PARAM_THERMAL_CLEANSE_FUNCTION,
-                    PARAM_INTERNET_TIME,
-                    PARAM_INTERNET_WEATHER,
-                }
-                
-                set_zoned_params = []
-                for param in params_to_set:
-                    if param in ZONED_PARAMS:
-                        for zone in range(1, 7):
-                            set_zoned_params.append(param_zoned(param, zone))
-                    else:
-                        set_zoned_params.append(param)
-
-                for param in set_zoned_params:
-                    data = call.data.get(param, "")
-                    if data != "":
-                        parameter_list[param] = str(data)
-
-                _LOGGER.debug("Ariston device found, data to check and send")
-
-                api.ariston_api.set_http_data(**parameter_list)
-                return
-            raise Exception("Corresponding entity_id for Ariston not found")
-        return
-
-    hass.services.register(DOMAIN, SERVICE_SET_DATA, set_ariston_data)
-
-    if not hass.data[DATA_ARISTON][DEVICES]:
-        return False
-    # Return boolean to indicate that initialization was successful.
-    return True
 
 
 class AristonDevice:

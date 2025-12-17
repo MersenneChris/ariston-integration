@@ -44,6 +44,19 @@ for param in switches_default:
         del SWITCHES[param]
 
 
+async def async_setup_entry(hass, entry, async_add_entities):
+    """Set up Ariston switches from a config entry."""
+    name = entry.data.get(CONF_NAME, "Ariston")
+    device = hass.data[DATA_ARISTON][DEVICES][name]
+    
+    switches = list(switches_default)
+    
+    async_add_entities(
+        [AristonSwitch(name, device, switch_type) for switch_type in switches],
+        True,
+    )
+
+
 def setup_platform(hass, config, add_entities, discovery_info=None):
     """Set up a switches for Ariston."""
     if discovery_info is None:

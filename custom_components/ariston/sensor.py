@@ -268,6 +268,19 @@ for param in sensors_default:
         del SENSORS[param]
 
 
+async def async_setup_entry(hass, entry, async_add_entities):
+    """Set up Ariston sensors from a config entry."""
+    name = entry.data.get(CONF_NAME, "Ariston")
+    device = hass.data[DATA_ARISTON][DEVICES][name]
+    
+    sensors = list(sensors_default)
+    
+    async_add_entities(
+        [AristonSensor(name, device, sensor_type) for sensor_type in sensors],
+        True,
+    )
+
+
 def setup_platform(hass, config, add_entities, discovery_info=None):
     """Set up a sensor for Ariston."""
     if discovery_info is None:

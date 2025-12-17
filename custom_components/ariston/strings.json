@@ -1,0 +1,38 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Ariston",
+        "description": "Enter your Ariston account credentials",
+        "data": {
+          "username": "Username (email)",
+          "password": "Password",
+          "name": "Name",
+          "gw": "Gateway (optional)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to Ariston. Please check your credentials.",
+      "unknown": "Unexpected error occurred"
+    },
+    "abort": {
+      "already_configured": "This account is already configured"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Ariston Options",
+        "description": "Configure advanced options for your Ariston device",
+        "data": {
+          "period_get": "Get period (seconds, 30-3600)",
+          "period_set": "Set period (seconds, 30-3600)",
+          "max_set_retries": "Max set retries (1-10)",
+          "logging": "Logging level",
+          "num_ch_zones": "Number of CH zones (1-6)"
+        }
+      }
+    }
+  }
+}

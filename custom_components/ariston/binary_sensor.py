@@ -81,6 +81,19 @@ for param in binary_sensors_default:
         del BINARY_SENSORS[param]
 
 
+async def async_setup_entry(hass, entry, async_add_entities):
+    """Set up Ariston binary sensors from a config entry."""
+    name = entry.data.get(CONF_NAME, "Ariston")
+    device = hass.data[DATA_ARISTON][DEVICES][name]
+    
+    binary_sensors = list(binary_sensors_default)
+    
+    async_add_entities(
+        [AristonBinarySensor(name, device, sensor_type) for sensor_type in binary_sensors],
+        True,
+    )
+
+
 def setup_platform(hass, config, add_entities, discovery_info=None):
     """Set up a binary sensor for Ariston."""
     if discovery_info is None:

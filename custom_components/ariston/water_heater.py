@@ -45,6 +45,13 @@ SCAN_INTERVAL = timedelta(seconds=2)
 _LOGGER = logging.getLogger(__name__)
 
 
+async def async_setup_entry(hass, entry, async_add_entities):
+    """Set up Ariston water heater from a config entry."""
+    name = entry.data.get(CONF_NAME, "Ariston")
+    device = hass.data[DATA_ARISTON][DEVICES][name]
+    async_add_entities([AristonWaterHeater(name, device)], True)
+
+
 def setup_platform(hass, config, add_entities, discovery_info=None):
     """Set up the Ariston water heater devices."""
     if discovery_info is None:

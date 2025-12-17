@@ -73,6 +73,20 @@ for param in selects_deafult:
 
 _LOGGER = logging.getLogger(__name__)
 
+
+async def async_setup_entry(hass, entry, async_add_entities):
+    """Set up Ariston selects from a config entry."""
+    name = entry.data.get(CONF_NAME, "Ariston")
+    device = hass.data[DATA_ARISTON][DEVICES][name]
+    
+    selects = list(selects_deafult)
+    
+    async_add_entities(
+        [AristonSelect(name, device, select_type) for select_type in selects],
+        True,
+    )
+
+
 def setup_platform(hass, config, add_entities, discovery_info=None):
     """Set up a select for Ariston."""
     if discovery_info is None:

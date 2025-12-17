@@ -51,6 +51,20 @@ UNKNOWN_TEMP = 0.0
 _LOGGER = logging.getLogger(__name__)
 
 
+async def async_setup_entry(hass, entry, async_add_entities):
+    """Set up Ariston climate from a config entry."""
+    name = entry.data.get(CONF_NAME, "Ariston")
+    device = hass.data[DATA_ARISTON][DEVICES][name]
+    num_ch_zones = entry.options.get("num_ch_zones", 1)
+    
+    climates = []
+    for zone in range(1, num_ch_zones + 1):
+        climate_name = f"{name} Zone{zone}"
+        climates.append(AristonThermostat(name, device, climate_name))
+    
+    async_add_entities(climates, True)
+
+
 def setup_platform(hass, config, add_entities, discovery_info=None):
     """Setup the Ariston Platform."""
     if discovery_info is None:
