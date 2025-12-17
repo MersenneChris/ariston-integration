@@ -49,7 +49,10 @@ async def async_setup_entry(hass, entry, async_add_entities):
     name = entry.data.get(CONF_NAME, "Ariston")
     device = hass.data[DATA_ARISTON][DEVICES][name]
     
-    switches = list(switches_default)
+    # Filter switches to only those available in the API
+    api = device.api.ariston_api
+    switches = [s for s in switches_default.keys() if s in api.sensor_values]
+    _LOGGER.info("Adding %d switches for %s", len(switches), name)
     
     async_add_entities(
         [AristonSwitch(name, device, switch_type) for switch_type in switches],
