@@ -925,7 +925,7 @@ class AristonHandler:
                 "language": "English_Us"
                 }
             self._request_post(
-                url=f'{self._ARISTON_URL}/R2/Account/Login?returnUrl=%2FR2%2FHome',
+                url=f'{self._ARISTON_URL}/R2/Account/Login',
                 json_data=login_data,
                 error_msg='Login'
             )
