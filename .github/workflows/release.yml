@@ -1,0 +1,25 @@
+---
+name: Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  release:
+    name: Prepare release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.0.0
+      - name: Zip Release
+        uses: TheDoctor0/zip-release@0.7.1
+        with:
+          filename: ariston-nimbus-integration.zip
+          directory: custom_components/ariston
+      - name: Upload to Release Action
+        uses: Shopify/upload-to-release@v1.0.1
+        with:
+          name: ariston-nimbus-integration.zip
+          path: custom_components/ariston/ariston-nimbus-integration.zip
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
