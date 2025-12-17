@@ -86,7 +86,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     period_get = options.get(CONF_PERIOD_GET, DEFAULT_PERIOD_GET)
     period_set = options.get(CONF_PERIOD_SET, DEFAULT_PERIOD_SET)
     max_retries = options.get(CONF_MAX_SET_RETRIES, DEFAULT_MAX_RETRIES)
-    logging_level = options.get(CONF_LOG, "WARNING")
+    logging_level = options.get(CONF_LOG, "NOTSET")
     num_ch_zones = options.get(CONF_CH_ZONES, 1)
     
     # Use default sensors, binary_sensors, switches, and selectors for UI config
