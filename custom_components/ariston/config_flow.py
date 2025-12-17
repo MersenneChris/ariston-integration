@@ -1,5 +1,4 @@
 """Config flow for Ariston integration."""
-import logging
 import voluptuous as vol
 
 from homeassistant import config_entries
@@ -7,7 +6,6 @@ from homeassistant.const import CONF_NAME, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import callback
 import homeassistant.helpers.config_validation as cv
 
-from .ariston import AristonHandler
 from .const import (
     DOMAIN,
     CONF_GW,
@@ -17,8 +15,6 @@ from .const import (
     CONF_MAX_SET_RETRIES,
     CONF_CH_ZONES,
 )
-
-_LOGGER = logging.getLogger(__name__)
 
 DEFAULT_NAME = "Ariston"
 DEFAULT_MAX_RETRIES = 5
@@ -38,45 +34,14 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
 
         if user_input is not None:
-            # Validate the username and password by attempting to connect
             await self.async_set_unique_id(user_input[CONF_USERNAME])
             self._abort_if_unique_id_configured()
 
-            # Test connection
-            try:
-                # Create a temporary API handler to test credentials
-                test_api = AristonHandler(
-                    username=user_input[CONF_USERNAME],
-                    password=user_input[CONF_PASSWORD],
-                    sensors=[],
-                    logging_level=DEFAULT_LOG,
-                    gw=user_input.get(CONF_GW, ""),
-                    set_max_retries=DEFAULT_MAX_RETRIES,
-                    period_get_request=DEFAULT_PERIOD_GET,
-                    period_set_request=DEFAULT_PERIOD_SET,
-                )
-                
-                # Start the API to verify credentials
-                test_api.start()
-                
-                # Wait a moment for the API to connect
-                import asyncio
-                await asyncio.sleep(5)
-                
-                # Check if online
-                if not test_api.get_value("online"):
-                    test_api.stop()
-                    errors["base"] = "cannot_connect"
-                else:
-                    test_api.stop()
-                    # Create the entry
-                    return self.async_create_entry(
-                        title=user_input.get(CONF_NAME, DEFAULT_NAME),
-                        data=user_input,
-                    )
-            except Exception as err:
-                _LOGGER.error("Error connecting to Ariston: %s", err)
-                errors["base"] = "cannot_connect"
+            # Defer connection checks to setup; avoids blocking network calls in the flow
+            return self.async_create_entry(
+                title=user_input.get(CONF_NAME, DEFAULT_NAME),
+                data=user_input,
+            )
 
         # Show the form
         data_schema = vol.Schema(
@@ -85,6 +50,10 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_PASSWORD): cv.string,
                 vol.Optional(CONF_NAME, default=DEFAULT_NAME): cv.string,
                 vol.Optional(CONF_GW, default=""): cv.string,
+                vol.Optional(
+                    CONF_LOG,
+                    default=DEFAULT_LOG,
+                ): vol.In(["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"]),
             }
         )
 
@@ -131,7 +100,7 @@ class AristonOptionsFlowHandler(config_entries.OptionsFlow):
                 ): vol.All(int, vol.Range(min=1, max=10)),
                 vol.Optional(
                     CONF_LOG,
-                    default=options.get(CONF_LOG, DEFAULT_LOG),
+                    default=options.get(CONF_LOG, self.config_entry.data.get(CONF_LOG, DEFAULT_LOG)),
                 ): vol.In(["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"]),
                 vol.Optional(
                     CONF_CH_ZONES,
