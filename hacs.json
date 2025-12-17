@@ -1,7 +1,4 @@
 {
   "name": "Ariston NET - Nimbus Integration",
-  "render_readme": true,
-  "homeassistant": "2024.1.0",
-  "zip_release": true,
-  "filename": "ariston-integration.zip"
+  "render_readme": true
 }

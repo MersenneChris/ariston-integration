@@ -1,12 +1,14 @@
 {
   "domain": "ariston",
   "name": "Ariston",
-  "documentation": "https://github.com/MersenneChris/ariston-integration",
-  "issue_tracker": "https://github.com/MersenneChris/ariston-integration/issues",
-  "requirements": [],
-  "dependencies": [],
   "codeowners": ["@MersenneChris"],
   "config_flow": true,
-  "version": "1.0.0",
-  "iot_class": "cloud_polling"
+  "dependencies": [],
+  "documentation": "https://github.com/MersenneChris/ariston-integration",
+  "integration_type": "device",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/MersenneChris/ariston-integration/issues",
+  "requirements": [],
+  "topics":  ["hacs", "hacs-integration"],
+  "version": "1.0.0"
 }
