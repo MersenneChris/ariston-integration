@@ -1,4 +1,5 @@
 {
   "name": "Ariston NET - Nimbus Integration",
+  "country": ["*"],
   "render_readme": true
 }
