@@ -5,6 +5,9 @@ on:
   release:
     types: [published]
 
+permissions:
+  contents: write
+
 jobs:
   release:
     name: Prepare release
@@ -17,9 +20,13 @@ jobs:
         with:
           filename: ariston-nimbus-integration.zip
           directory: custom_components/ariston
-      - name: Upload to Release Action
-        uses: Shopify/upload-to-release@v1.0.1
+      - name: Verify artifact exists
+        run: |
+          ls -la
+          test -f ariston-nimbus-integration.zip
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: ariston-nimbus-integration.zip
-          path: custom_components/ariston/ariston-nimbus-integration.zip
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          files: ariston-nimbus-integration.zip
