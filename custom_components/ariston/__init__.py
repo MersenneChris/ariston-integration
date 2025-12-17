@@ -95,6 +95,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     switches = list(switches_default)
     selectors = list(selects_deafult)
     
+    _LOGGER.info("Setting up Ariston entry: name=%s, gw=%s", name, gw)
+
     api = AristonChecker(
         hass=hass,
         device=entry.data,
@@ -114,7 +116,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     
     # Start api execution
     api.ariston_api.start()
-    
+    _LOGGER.info("Ariston API started for %s", name)
+
     climates = []
     for zone in range(1, num_ch_zones + 1):
         climates.append(f'{name} Zone{zone}')
@@ -144,9 +147,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     
     # Store device
     hass.data[DATA_ARISTON][DEVICES][name] = AristonDevice(api, entry.data)
+    _LOGGER.info("Stored Ariston device: %s", name)
     
     # Forward entry setup to platforms
+    _LOGGER.info("Forwarding entry to platforms: %s", ", ".join(p.value for p in PLATFORMS))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    _LOGGER.info("Platforms setup forwarded for %s", name)
     
     # Register service
     async def set_ariston_data(call: ServiceCall):

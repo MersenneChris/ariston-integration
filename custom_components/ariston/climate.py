@@ -61,7 +61,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     for zone in range(1, num_ch_zones + 1):
         climate_name = f"{name} Zone{zone}"
         climates.append(AristonThermostat(name, device, climate_name))
-    
+    _LOGGER.info("Adding %d climate entities for %s", len(climates), name)
     async_add_entities(climates, True)
 
 

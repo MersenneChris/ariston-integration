@@ -36,23 +36,15 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             await self.async_set_unique_id(user_input[CONF_USERNAME])
 
-            # If an entry with this unique_id already exists, update it instead of aborting
+            # If an entry with this unique_id already exists, remove it and replace
             existing = next(
                 (e for e in self._async_current_entries() if e.unique_id == user_input[CONF_USERNAME]),
                 None,
             )
             if existing:
-                # Merge incoming data with existing to preserve unspecified fields
-                new_data = {
-                    **existing.data,
-                    **user_input,
-                }
-                self.hass.config_entries.async_update_entry(existing, data=new_data)
-                # Reload to apply changes immediately
-                await self.hass.config_entries.async_reload(existing.entry_id)
-                return self.async_abort(reason="reconfigured")
+                await self.hass.config_entries.async_remove(existing.entry_id)
 
-            # No existing entry: create a new one
+            # Create a fresh entry with the provided data
             return self.async_create_entry(
                 title=user_input.get(CONF_NAME, DEFAULT_NAME),
                 data=user_input,

@@ -49,6 +49,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     """Set up Ariston water heater from a config entry."""
     name = entry.data.get(CONF_NAME, "Ariston")
     device = hass.data[DATA_ARISTON][DEVICES][name]
+    _LOGGER.info("Adding water heater entity for %s", name)
     async_add_entities([AristonWaterHeater(name, device)], True)
 
 
