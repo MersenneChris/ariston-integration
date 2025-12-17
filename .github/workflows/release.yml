@@ -22,11 +22,11 @@ jobs:
           directory: custom_components/ariston
       - name: Verify artifact exists
         run: |
-          ls -la
-          test -f ariston-nimbus-integration.zip
+          ls -la custom_components/ariston/
+          test -f custom_components/ariston/ariston-nimbus-integration.zip
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          files: ariston-nimbus-integration.zip
+          files: custom_components/ariston/ariston-nimbus-integration.zip
