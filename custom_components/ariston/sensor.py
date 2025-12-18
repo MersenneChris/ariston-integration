@@ -27,7 +27,6 @@ from .const import (
     PARAM_CH_ECONOMY_TEMPERATURE,
     PARAM_CH_DETECTED_TEMPERATURE,
     PARAM_CH_PROGRAM,
-    PARAM_CH_WATER_TEMPERATURE,
     PARAM_ERRORS_COUNT,
     PARAM_DHW_COMFORT_FUNCTION,
     PARAM_DHW_MODE,
@@ -112,7 +111,6 @@ SENSOR_CH_SET_TEMPERATURE = "CH Set Temperature"
 SENSOR_CH_PROGRAM = "CH Time Program"
 SENSOR_CH_COMFORT_TEMPERATURE = "CH Comfort Temperature"
 SENSOR_CH_ECONOMY_TEMPERATURE = "CH Economy Temperature"
-SENSOR_CH_WATER_TEMPERATURE = "CH Water Temperature"
 SENSOR_CH_FLOW_SETPOINT_TEMPERATURE = "CH Flow Setpoint Temperature"
 SENSOR_CH_FIXED_TEMPERATURE = "CH Fixed Temperature"
 SENSOR_DHW_COMFORT_FUNCTION = "DHW Comfort Function"
@@ -132,10 +130,6 @@ SENSOR_GAS_TYPE = "Gas Type"
 SENSOR_GAS_COST = "Gas Cost"
 SENSOR_ELECTRICITY_COST = "Electricity Cost"
 SENSOR_PRESSURE = "Water Pressure"
-SENSOR_CH_LAST_MONTH_ELECTRICITY = "Electricity use for CH Last Month"
-SENSOR_CH_LAST_MONTH_GAS = "Gas use for CH Last Month"
-SENSOR_DHW_LAST_MONTH_ELECTRICITY = "Electricity use for DHW Last Month"
-SENSOR_DHW_LAST_MONTH_GAS = "Gas use for DHW Last Month"
 SENSOR_CH_ENERGY_TODAY = 'CH energy today'
 SENSOR_CH_ENERGY_YESTERDAY = 'CH energy yesterday'
 SENSOR_DHW_ENERGY_TODAY = 'DHW energy today'
@@ -164,20 +158,20 @@ SENSOR_CH_ENERGY2_THIS_YEAR = 'CH energy 2 this year'
 SENSOR_CH_ENERGY2_LAST_YEAR = 'CH energy 2 last year'
 SENSOR_DHW_ENERGY2_THIS_YEAR = 'DHW energy 2 this year'
 SENSOR_DHW_ENERGY2_LAST_YEAR = 'DHW energy 2 last year'
-SENSOR_CH_ENERGY_DELTA_TODAY = 'CH energy 2 today'
-SENSOR_CH_ENERGY_DELTA_YESTERDAY = 'CH energy 2 yesterday'
-SENSOR_DHW_ENERGY_DELTA_TODAY = 'DHW energy 2 today'
-SENSOR_DHW_ENERGY_DELTA_YESTERDAY = 'DHW energy 2 yesterday'
-SENSOR_CH_ENERGY_DELTA_LAST_7_DAYS = 'CH energy 2 last 7 days'
-SENSOR_DHW_ENERGY_DELTA_LAST_7_DAYS = 'DHW energy 2 last 7 days'
-SENSOR_CH_ENERGY_DELTA_THIS_MONTH = 'CH energy 2 this month'
-SENSOR_CH_ENERGY_DELTA_LAST_MONTH = 'CH energy 2 last month'
-SENSOR_DHW_ENERGY_DELTA_THIS_MONTH = 'DHW energy 2 this month'
-SENSOR_DHW_ENERGY_DELTA_LAST_MONTH = 'DHW energy 2 last month'
-SENSOR_CH_ENERGY_DELTA_THIS_YEAR = 'CH energy 2 this year'
-SENSOR_CH_ENERGY_DELTA_LAST_YEAR = 'CH energy 2 last year'
-SENSOR_DHW_ENERGY_DELTA_THIS_YEAR = 'DHW energy 2 this year'
-SENSOR_DHW_ENERGY_DELTA_LAST_YEAR = 'DHW energy 2 last year'
+SENSOR_CH_ENERGY_DELTA_TODAY = 'CH energy delta today'
+SENSOR_CH_ENERGY_DELTA_YESTERDAY = 'CH energy delta yesterday'
+SENSOR_DHW_ENERGY_DELTA_TODAY = 'DHW energy delta today'
+SENSOR_DHW_ENERGY_DELTA_YESTERDAY = 'DHW energy delta yesterday'
+SENSOR_CH_ENERGY_DELTA_LAST_7_DAYS = 'CH energy delta last 7 days'
+SENSOR_DHW_ENERGY_DELTA_LAST_7_DAYS = 'DHW energy delta last 7 days'
+SENSOR_CH_ENERGY_DELTA_THIS_MONTH = 'CH energy delta this month'
+SENSOR_CH_ENERGY_DELTA_LAST_MONTH = 'CH energy delta last month'
+SENSOR_DHW_ENERGY_DELTA_THIS_MONTH = 'DHW energy delta this month'
+SENSOR_DHW_ENERGY_DELTA_LAST_MONTH = 'DHW energy delta last month'
+SENSOR_CH_ENERGY_DELTA_THIS_YEAR = 'CH energy delta this year'
+SENSOR_CH_ENERGY_DELTA_LAST_YEAR = 'CH energy delta last year'
+SENSOR_DHW_ENERGY_DELTA_THIS_YEAR = 'DHW energy delta this year'
+SENSOR_DHW_ENERGY_DELTA_LAST_YEAR = 'DHW energy delta last year'
 SENSOR_VERSION = 'Integration local version'
 
 _LOGGER = logging.getLogger(__name__)
@@ -191,7 +185,6 @@ sensors_default = {
     PARAM_CH_PROGRAM: [SENSOR_CH_PROGRAM, None, "mdi:calendar-month", None],
     PARAM_CH_COMFORT_TEMPERATURE: [SENSOR_CH_COMFORT_TEMPERATURE, SensorDeviceClass.TEMPERATURE, "mdi:radiator", None],
     PARAM_CH_ECONOMY_TEMPERATURE: [SENSOR_CH_ECONOMY_TEMPERATURE, SensorDeviceClass.TEMPERATURE, "mdi:radiator", None],
-    PARAM_CH_WATER_TEMPERATURE: [SENSOR_CH_WATER_TEMPERATURE, SensorDeviceClass.TEMPERATURE, "mdi:radiator", None],
     PARAM_CH_FLOW_TEMP: [SENSOR_CH_FLOW_SETPOINT_TEMPERATURE, SensorDeviceClass.TEMPERATURE, "mdi:radiator", None],
     PARAM_CH_FIXED_TEMP: [SENSOR_CH_FIXED_TEMPERATURE, SensorDeviceClass.TEMPERATURE, "mdi:radiator", None],
     PARAM_DHW_PROGRAM: [SENSOR_DHW_PROGRAM, None, "mdi:calendar-month", None],
@@ -208,10 +201,6 @@ sensors_default = {
     PARAM_UNITS: [SENSOR_UNITS, None, "mdi:scale-balance", None],
     PARAM_THERMAL_CLEANSE_CYCLE: [SENSOR_THERMAL_CLEANSE_CYCLE, None, "mdi:update", None],
     PARAM_PRESSURE: [SENSOR_PRESSURE, SensorDeviceClass.PRESSURE, "mdi:gauge", None],
-    PARAM_CH_LAST_MONTH_ELECTRICITY: [SENSOR_CH_LAST_MONTH_ELECTRICITY, SensorDeviceClass.ENERGY, "mdi:cash", None],
-    PARAM_CH_LAST_MONTH_GAS: [SENSOR_CH_LAST_MONTH_GAS, SensorDeviceClass.ENERGY, "mdi:cash", None],
-    PARAM_DHW_LAST_MONTH_ELECTRICITY: [SENSOR_DHW_LAST_MONTH_ELECTRICITY, SensorDeviceClass.ENERGY, "mdi:cash", None],
-    PARAM_DHW_LAST_MONTH_GAS: [SENSOR_DHW_LAST_MONTH_GAS, SensorDeviceClass.ENERGY, "mdi:cash", None],
     PARAM_CH_ENERGY_TODAY: [SENSOR_CH_ENERGY_TODAY, SensorDeviceClass.ENERGY, "mdi:cash", SensorStateClass.TOTAL_INCREASING],
     PARAM_DHW_ENERGY_TODAY: [SENSOR_DHW_ENERGY_TODAY, SensorDeviceClass.ENERGY, "mdi:cash", SensorStateClass.TOTAL_INCREASING],
     PARAM_CH_ENERGY_YESTERDAY: [SENSOR_CH_ENERGY_YESTERDAY, SensorDeviceClass.ENERGY, "mdi:cash", None],

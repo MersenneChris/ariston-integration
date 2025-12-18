@@ -66,7 +66,6 @@ Order of Installation:
   - `ch_set_temperature` - set CH temperature.
   - `ch_comfort_temperature` - CH comfort temperature.
   - `ch_economy_temperature` - CH economy temperature.
-  - `ch_water_temperature` - CH Water Temperature. **WORKS ONLY ON SPECIFIC MODELS WHILE ON OTHERS CAUSES CRASHES**
   - `ch_fixed_temperature` - CH Fixed Temperature.
   - `dhw_set_temperature` - set DHW temperature.
   - `dhw_comfort_temperature` - DHW storage comfort temperature. Not supported on all models.
@@ -81,7 +80,6 @@ Order of Installation:
   - `ch_economy_temperature` - CH economy temperature.
   - `ch_set_temperature` - set CH temperature.
   - `ch_program` - CH Time Program.
-  - `ch_water_temperature` - CH Water Temperature. **WORKS ONLY ON SPECIFIC MODELS WHILE ON OTHERS CAUSES CRASHES**
   - `ch_fixed_temperature` - CH Fixed Temperature.
   - `ch_flow_temperature` - CH Flow Setpoint Temperature.
   - `dhw_program` - DHW Time Program.
@@ -98,10 +96,6 @@ Order of Installation:
   - `pressure` - Water Pressure.
   - `signal_strength` - Wifi signal strength.
   - `units` - Units of measurement.
-  - `ch_gas_last_month` - gas use last month for CH.
-  - `ch_electricity_last_month` - electricity use last month for CH.
-  - `dhw_gas_last_month` - gas use last month for DHW.
-  - `dhw_electricity_last_month` - electricity use last month for DHW.
   - `ch_energy_today` - Energy use for CH today (matches values in application for some models, unavailable for other models)
   - `ch_energy_yesterday` - Energy use for CH yesterday (matches values in application for some models, unavailable for other models)
   - `dhw_energy_today` - Energy use for DHW today (matches values in application for some models, unavailable for other models)
@@ -149,17 +143,12 @@ Order of Installation:
 #### Binary sensors
 **Some parameters are not supported on all models**
   - `ch_auto_function` - CH AUTO function status.
-  - `ch_flame` - CH heating ongoing.
   - `ch_pilot` - CH Pilot mode.
-  - `dhw_flame` - DHW heating ongoing. **This parameter is not reported by boilers and is approximated based on multiple parameters**.
   - `dhw_thermal_cleanse_function` - DHW thermal cleanse function.
-  - `flame` - CH and/or DHW heating ongoing.
   - `heat_pump` - Heating pump status.
   - `holiday_mode` - Holiday mode status.
   - `internet_time` - Internet time status.
   - `internet_weather` - Internet weather status. **WORKS ONLY ON SPECIFIC MODELS WHILE ON OTHERS CAUSES CRASHES**
-  - `changing_data` - API is attempting to configure requested data. **API specific sensor**.
-  - `online` - Online status. Indicates if API has communication with the heater. **API specific sensor**.
 
 
 ### Example of configuration.yaml entry

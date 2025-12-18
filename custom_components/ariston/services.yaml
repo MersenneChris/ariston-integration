@@ -82,9 +82,6 @@ set_data:
     ch_economy_temperature_zone6:
       description: "(Optional) Set CH Economy temperature in steps of '0.5'. Value range depends on model."
       example: 23.5
-    ch_water_temperature:
-      description: "(Optional) Set CH water temperature in steps of '1.0'. Value range depends on model."
-      example: 80
     ch_fixed_temperature:
       description: "(Optional) Set CH fixed water temperature in steps of '1.0'. Value range depends on model."
       example: -4
