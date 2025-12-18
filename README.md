@@ -93,7 +93,6 @@ Order of Installation:
   - `errors_count` - active errors (no actual errors to test on).
   - `mode` - mode of boiler (`off` or `summer` or `winter` and others).
   - `outside_temperature` - outside temperature. Not supported on all models.
-  - `pressure` - Water Pressure.
   - `signal_strength` - Wifi signal strength.
   - `units` - Units of measurement.
   - `ch_energy_today` - Energy use for CH today (matches values in application for some models, unavailable for other models)
