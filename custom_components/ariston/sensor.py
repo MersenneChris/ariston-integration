@@ -18,6 +18,7 @@ from .const import param_zoned
 from .const import (
     DATA_ARISTON,
     DEVICES,
+    DOMAIN,
     OPTIONS,
     PARAM_CH_ANTIFREEZE_TEMPERATURE,
     PARAM_CH_MODE,
@@ -305,6 +306,7 @@ class AristonSensor(Entity):
 
     def __init__(self, name, device, sensor_type):
         """Initialize a sensor for Ariston."""
+        self._device_name = name
         self._name = "{} {}".format(name, SENSORS[sensor_type][0])
         self._signal_name = name
         self._api = device.api.ariston_api
@@ -352,6 +354,16 @@ class AristonSensor(Entity):
     def device_class(self):
         """Return device class."""
         return self._device_class
+
+    @property
+    def device_info(self):
+        """Return device information for device registry linking."""
+        identifier = self._api.plant_id or self._device_name
+        return {
+            "identifiers": {(DOMAIN, identifier)},
+            "name": self._device_name,
+            "manufacturer": "Ariston",
+        }
         
     @property
     def extra_state_attributes(self):

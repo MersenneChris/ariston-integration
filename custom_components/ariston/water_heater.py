@@ -107,6 +107,16 @@ class AristonWaterHeater(WaterHeaterEntity):
         return self._api.dhw_available
 
     @property
+    def device_info(self):
+        """Return device information for device registry linking."""
+        identifier = self._api.plant_id or self._name
+        return {
+            "identifiers": {(DOMAIN, identifier)},
+            "name": self._name,
+            "manufacturer": "Ariston",
+        }
+
+    @property
     def supported_features(self):
         """Return the list of supported features."""
         try:

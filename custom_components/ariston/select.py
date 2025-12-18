@@ -10,6 +10,7 @@ from .const import param_zoned
 from .const import (
     DATA_ARISTON,
     DEVICES,
+    DOMAIN,
     PARAM_DHW_COMFORT_TEMPERATURE,
     PARAM_DHW_ECONOMY_TEMPERATURE,
     PARAM_MODE,
@@ -112,6 +113,7 @@ class AristonSelect(SelectEntity):
     def __init__(self, name, device, select_type):
         """Initialize entity."""
         self._api = device.api.ariston_api
+        self._device_name = name
         self._icon = SELECTS[select_type][1]
         self._name = "{} {}".format(name, SELECTS[select_type][0])
         self._select_type = select_type
@@ -137,6 +139,16 @@ class AristonSelect(SelectEntity):
     def icon(self):
         """Return the state attributes."""
         return self._icon
+
+    @property
+    def device_info(self):
+        """Return device information for device registry linking."""
+        identifier = self._api.plant_id or self._device_name
+        return {
+            "identifiers": {(DOMAIN, identifier)},
+            "name": self._device_name,
+            "manufacturer": "Ariston",
+        }
 
     @property
     def available(self):

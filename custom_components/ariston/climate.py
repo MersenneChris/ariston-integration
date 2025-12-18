@@ -21,6 +21,7 @@ from .const import (
     CONF_CLIMATES,
     DATA_ARISTON,
     DEVICES,
+    DOMAIN,
     OPTIONS_TXT,
     PARAM_CH_MODE,
     PARAM_MODE,
@@ -252,6 +253,16 @@ class AristonThermostat(ClimateEntity):
     def available(self):
         """Return True if entity is available."""
         return self._api.ch_available
+
+    @property
+    def device_info(self):
+        """Return device information for device registry linking."""
+        identifier = self._api.plant_id or self._name
+        return {
+            "identifiers": {(DOMAIN, identifier)},
+            "name": self._name,
+            "manufacturer": "Ariston",
+        }
 
     @property
     def target_temperature_step(self):
