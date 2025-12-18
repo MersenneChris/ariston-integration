@@ -11,36 +11,25 @@ from homeassistant.const import CONF_BINARY_SENSORS, CONF_NAME
 from .const import param_zoned
 from .const import (
     DATA_ARISTON,
+    DOMAIN,
     DEVICES,
     PARAM_HOLIDAY_MODE,
-    PARAM_ONLINE,
-    PARAM_FLAME,
     PARAM_HEAT_PUMP,
-    PARAM_CHANGING_DATA,
     PARAM_INTERNET_TIME,
     PARAM_INTERNET_WEATHER,
     PARAM_CH_AUTO_FUNCTION,
-    PARAM_CH_FLAME,
-    PARAM_DHW_FLAME,
     PARAM_THERMAL_CLEANSE_FUNCTION,
-    PARAM_CH_PILOT,
     VALUE,
     VAL_ON,
     ZONED_PARAMS
 )
 
-BINARY_SENSOR_CH_FLAME = "CH Flame"
-BINARY_SENSOR_DHW_FLAME = "DHW Flame"
 BINARY_SENSOR_CH_AUTO_FUNCTION = "CH Auto Function"
 BINARY_SENSOR_HOLIDAY_MODE = "Holiday Mode"
-BINARY_SENSOR_ONLINE = "Online"
-BINARY_SENSOR_FLAME = "Flame"
 BINARY_SENSOR_HEAT_PUMP = "Heat Pump"
-BINARY_SENSOR_CHANGING_DATA = "Changing Data"
 BINARY_SENSOR_INTERNET_TIME = "Internet Time"
 BINARY_SENSOR_INTERNET_WEATHER = "Internet Weather"
 BINARY_SENSOR_THERMAL_CLEANSE_FUNCTION = "Thermal Cleanse Function"
-BINARY_SENSOR_CH_PILOT = "CH Pilot"
 
 SCAN_INTERVAL = timedelta(seconds=2)
 
@@ -49,13 +38,8 @@ _LOGGER = logging.getLogger(__name__)
 # Binary sensor types are defined like: Name, device class
 binary_sensors_default = {
     PARAM_CH_AUTO_FUNCTION: (BINARY_SENSOR_CH_AUTO_FUNCTION, None, "mdi:radiator"),
-    PARAM_CH_FLAME: (BINARY_SENSOR_CH_FLAME, None, "mdi:fire"),
-    PARAM_DHW_FLAME: (BINARY_SENSOR_DHW_FLAME, None, "mdi:fire"),
     PARAM_HOLIDAY_MODE: (BINARY_SENSOR_HOLIDAY_MODE, None, "mdi:island"),
-    PARAM_ONLINE: (BINARY_SENSOR_ONLINE, BinarySensorDeviceClass.CONNECTIVITY, None),
-    PARAM_FLAME: (BINARY_SENSOR_FLAME, None, "mdi:fire"),
     PARAM_HEAT_PUMP: (BINARY_SENSOR_HEAT_PUMP, None, "mdi:fan"),
-    PARAM_CHANGING_DATA: (BINARY_SENSOR_CHANGING_DATA, None, "mdi:cogs"),
     PARAM_INTERNET_TIME: (BINARY_SENSOR_INTERNET_TIME, None, "mdi:update"),
     PARAM_INTERNET_WEATHER: (
         BINARY_SENSOR_INTERNET_WEATHER,
@@ -67,7 +51,6 @@ binary_sensors_default = {
         None,
         "mdi:allergy",
     ),
-    PARAM_CH_PILOT: (BINARY_SENSOR_CH_PILOT, None, "mdi:head-cog-outline"),
 }
 BINARY_SENSORS = deepcopy(binary_sensors_default)
 for param in binary_sensors_default:
@@ -122,6 +105,7 @@ class AristonBinarySensor(BinarySensorEntity):
         self._attrs = {}
         self._device_class = BINARY_SENSORS[sensor_type][1]
         self._icon = BINARY_SENSORS[sensor_type][2]
+        self._device_name = name
         self._name = "{} {}".format(name, BINARY_SENSORS[sensor_type][0])
         self._sensor_type = sensor_type
         self._state = None
@@ -157,17 +141,22 @@ class AristonBinarySensor(BinarySensorEntity):
         return self._device_class
 
     @property
+    def device_info(self):
+        """Return device information for device registry linking."""
+        # Use gateway/plant_id when available; fall back to configured name
+        identifier = self._api.plant_id or self._device_name
+        return {
+            "identifiers": {(DOMAIN, identifier)},
+            "name": self._device_name,
+            "manufacturer": "Ariston",
+        }
+
+    @property
     def available(self):
-        """Return True if entity is available."""
-        if self._sensor_type == PARAM_ONLINE:
-            return True
-        elif self._sensor_type == PARAM_CHANGING_DATA:
-            return self._api.available
-        else:
-            return (
-                self._api.available
-                and not self._api.sensor_values[self._sensor_type][VALUE] is None
-            )
+        return (
+            self._api.available
+            and not self._api.sensor_values[self._sensor_type][VALUE] is None
+        )
 
     @property
     def icon(self):
@@ -177,16 +166,11 @@ class AristonBinarySensor(BinarySensorEntity):
     def update(self):
         """Update entity."""
         try:
-            if self._sensor_type == PARAM_ONLINE:
-                self._state = self._api.available
-            elif self._sensor_type == PARAM_CHANGING_DATA:
-                self._state = self._api.setting_data
+            if not self._api.available:
+                return
+            if self._api.sensor_values[self._sensor_type][VALUE] == VAL_ON:
+                self._state = True
             else:
-                if not self._api.available:
-                    return
-                if self._api.sensor_values[self._sensor_type][VALUE] == VAL_ON:
-                    self._state = True
-                else:
-                    self._state = False
+                self._state = False
         except KeyError:
             _LOGGER.warning("Problem updating binary_sensors for Ariston")

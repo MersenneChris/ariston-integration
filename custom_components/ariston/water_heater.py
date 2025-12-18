@@ -20,7 +20,6 @@ from .const import (
     PARAM_DHW_MODE,
     PARAM_DHW_STORAGE_TEMPERATURE,
     PARAM_DHW_SET_TEMPERATURE,
-    PARAM_DHW_FLAME,
     PARAM_MODE,
     VAL_COOLING,
     VAL_SUMMER,
@@ -184,10 +183,7 @@ class AristonWaterHeater(WaterHeaterEntity):
         except KeyError:
             step = 1.0
         try:
-            if self._api.sensor_values[PARAM_DHW_FLAME][VALUE] == VAL_ON:
-                action = ACTION_HEATING
-            else:
-                action = ACTION_IDLE
+            action = ACTION_IDLE
         except KeyError:
             action = ACTION_IDLE
         return {"target_temp_step": step, "hvac_action": action}

@@ -62,14 +62,10 @@ PARAM_GAS_TYPE_UNIT = "gas_type_unit"
 PARAM_GAS_COST_UNIT = "gas_cost_unit"
 PARAM_ELECTRICITY_COST_UNIT = "electricity_cost_unit"
 PARAM_CH_AUTO_FUNCTION = "ch_auto_function"
-PARAM_CH_FLAME = "ch_flame"
-PARAM_DHW_FLAME = "dhw_flame"
-PARAM_FLAME = "flame"
 PARAM_HEAT_PUMP = "heat_pump"
 PARAM_HOLIDAY_MODE = "holiday_mode"
 PARAM_INTERNET_TIME = "internet_time"
 PARAM_INTERNET_WEATHER = "internet_weather"
-PARAM_ONLINE = "online"
 PARAM_CHANGING_DATA = "changing_data"
 PARAM_THERMAL_CLEANSE_FUNCTION = "dhw_thermal_cleanse_function"
 PARAM_CH_PILOT = "ch_pilot"
@@ -132,7 +128,6 @@ PARAM_CH_DEROGA_TEMPERATURE = "ch_deroga_temperature"
 PARAM_VERSION = 'integration_version'
 
 ZONED_PARAMS = [
-    PARAM_CH_FLAME,
     PARAM_CH_MODE,
     PARAM_CH_SET_TEMPERATURE,
     PARAM_CH_DETECTED_TEMPERATURE,

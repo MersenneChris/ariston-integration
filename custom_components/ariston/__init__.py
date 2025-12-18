@@ -40,7 +40,6 @@ from .const import (
     PARAM_CH_AUTO_FUNCTION,
     PARAM_INTERNET_TIME,
     PARAM_INTERNET_WEATHER,
-    PARAM_ONLINE,
     PARAM_CHANGING_DATA,
     PARAM_VERSION,
     PARAM_THERMAL_CLEANSE_FUNCTION,
@@ -280,8 +279,6 @@ class AristonChecker:
         """ Some sensors or switches are not part of API """
         if PARAM_CHANGING_DATA in list_of_sensors:
             list_of_sensors.remove(PARAM_CHANGING_DATA)
-        if PARAM_ONLINE in list_of_sensors:
-            list_of_sensors.remove(PARAM_ONLINE)
         if PARAM_VERSION in list_of_sensors:
             list_of_sensors.remove(PARAM_VERSION)
 

@@ -91,9 +91,6 @@ class AristonHandler:
     _PARAM_GAS_COST = "gas_cost"
     _PARAM_ELECTRICITY_COST = "electricity_cost"
     _PARAM_CH_AUTO_FUNCTION = "ch_auto_function"
-    _PARAM_CH_FLAME = "ch_flame"
-    _PARAM_DHW_FLAME = "dhw_flame"
-    _PARAM_FLAME = "flame"
     _PARAM_HEAT_PUMP = "heat_pump"
     _PARAM_HOLIDAY_MODE = "holiday_mode"
     _PARAM_INTERNET_TIME = "internet_time"
@@ -240,7 +237,6 @@ class AristonHandler:
         _PARAM_WEATHER: _ARISTON_PAR_WEATHER,
         _PARAM_MODE: _ARISTON_PAR_PLANT_MODE,
         _PARAM_HOLIDAY_MODE: _ARISTON_PAR_HOLIDAY,
-        _PARAM_FLAME: _ARISTON_PAR_FLAME,
         _PARAM_DHW_SET_TEMPERATURE: _ARISTON_PAR_DHW_TEMP,
         _PARAM_DHW_MODE: _ARISTON_PAR_DHW_MODE,
         _PARAM_DHW_COMFORT_TEMPERATURE: _ARISTON_PAR_DHW_COMFORT_TEMP,
@@ -250,7 +246,6 @@ class AristonHandler:
     }
     # Parameters in Android api within zone 1, mapping to parameter names
     _MAP_ARISTON_MULTIZONE_PARAMS = {
-        _PARAM_CH_FLAME: _ARISTON_PAR_ZONE_HEAT_REQUEST,
         _PARAM_CH_MODE: _ARIZTON_PAR_ZONE_MODE,
         _PARAM_CH_SET_TEMPERATURE: _ARISTON_PAR_ZONE_DESIRED_TEMP,
         _PARAM_CH_DETECTED_TEMPERATURE: _ARISTON_PAR_ZONE_MEAS_TEMP,
@@ -280,7 +275,6 @@ class AristonHandler:
     _LIST_ARISTON_API_PARAMS = [
         *_MAP_ARISTON_ZONE_0_PARAMS.keys(),
         *_MAP_ARISTON_MULTIZONE_PARAMS.keys(),
-        _PARAM_DHW_FLAME,
     ]
     _LIST_ARISTON_WEB_PARAMS = [
         *_MAP_ARISTON_WEB_MENU_PARAMS.keys(),
@@ -1005,37 +999,6 @@ class AristonHandler:
                                 value = option["text"]
                                 break
                     break
-        if sensor == self._PARAM_DHW_FLAME:
-            value = None
-            try:
-                increase_dhw_temp = None
-                new_value = self._ariston_sensors[self._PARAM_DHW_STORAGE_TEMPERATURE][self._VALUE]
-                if new_value:
-                    increase_dhw_temp = False
-                    if self._last_dhw_storage_temp is not None and \
-                        self._last_dhw_storage_temp > 0 and \
-                        new_value > 0:
-                        if new_value > self._last_dhw_storage_temp:
-                            increase_dhw_temp = True
-                    elif self._last_dhw_storage_temp is not None and\
-                        new_value > 0:
-                        self._last_dhw_storage_temp = new_value
-            except Exception:
-                increase_dhw_temp = None
-            ch_flame = None
-            for zone in self._zones:
-                ch_flame_zone = self._ariston_sensors[self._zone_sensor_name(self._PARAM_FLAME, zone)][self._VALUE]
-                if ch_flame_zone in self._OFF_ON_TEXT:
-                    if ch_flame is None or ch_flame == self._OFF:
-                        ch_flame = ch_flame_zone
-            if self._ariston_sensors[self._PARAM_FLAME][self._VALUE] in self._OFF_ON_TEXT and ch_flame in self._OFF_ON_TEXT:
-                if self._ariston_sensors[self._PARAM_FLAME][self._VALUE] == self._OFF:
-                    value = self._OFF
-                elif ch_flame == self._OFF:
-                    value = self._ON
-                else:
-                    # Unknown state of DHW
-                    value = increase_dhw_temp
         return value
 
 
@@ -1093,16 +1056,6 @@ class AristonHandler:
                     self._LOGGER.warn(f'Issue reading {request_type} {item["id"]}, {ex}')
                     continue
 
-            # Extrapolate DHW Flame
-            sensor = self._PARAM_DHW_FLAME
-            dhw_flame = self._get_visible_sensor_value(sensor)
-            self._ariston_sensors[sensor][self._VALUE] = dhw_flame
-            if dhw_flame:
-                self._ariston_sensors[sensor][self._OPTIONS] = self._OFF_ON_NUMERAL
-                self._ariston_sensors[sensor][self._OPTIONS_TXT] = self._OFF_ON_TEXT
-            else:
-                self._ariston_sensors[sensor][self._OPTIONS] = None
-                self._ariston_sensors[sensor][self._OPTIONS_TXT] = None
 
             # Fix min and Max for CH set temperature
             for zone in self._zones:
