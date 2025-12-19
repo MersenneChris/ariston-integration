@@ -1,22 +1,21 @@
 {
     "state": {
         "_": {
-            "Always active": "Siempre activo",
-            "Available": "Disponible",
-            "Disabled": "Deshabilitado",
-            "Heating only": "Sólo calefacción",
-            "imperial": "Imperial",
-            "intelligent": "Inteligente",
-            "Manual": "Manual",
-            "metric": "Métrico",
-            "OFF": "Off",
-            "Offline": "Offline",
-            "Time program": "Time program",
-            "Summer": "Verano",
-            "Time Based": "Time based",
-            "Winter": "Invierno",
-            "cooling": "Refrigeración",
-            "antifreeze": "Anticongelante"
+          "Always active": "Siempre activo",
+          "Available": "Disponible",
+          "Disabled": "Deshabilitado",
+          "Heating only": "Sólo calefacción",
+          "imperial": "Imperial",
+          "intelligent": "Inteligente",
+          "Manual": "Manual",
+          "metric": "Métrico",
+          "OFF": "Off",
+          "Offline": "Offline",
+          "Time program": "Time program",
+          "Summer": "Verano",
+          "Time Based": "Time based",
+          "Winter": "Invierno",
+          "antifreeze": "Anticongelante"
         }
     }
 }

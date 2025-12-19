@@ -144,8 +144,6 @@ class AristonHandler:
     _PARAM_DHW_ENERGY_DELTA_LAST_YEAR = 'dhw_energy_delta_last_year'
     _PARAM_HEATING_FLOW_TEMP = "ch_heating_flow_temp"
     _PARAM_HEATING_FLOW_OFFSET = "ch_heating_flow_offset"
-    _PARAM_COOLING_FLOW_TEMP = "ch_cooling_flow_temp"
-    _PARAM_COOLING_FLOW_OFFSET = "ch_cooling_flow_offset"
 
     # Ariston parameter codes in the menu
     _ARISTON_DHW_COMFORT_TEMP = "U6_9_0"
@@ -213,8 +211,6 @@ class AristonHandler:
     _ARISTON_PAR_AUTO_HEATING = "AutomaticThermoregulation"
     _ARISTON_PAR_HEATING_FLOW_TEMP = "HeatingFlowTemp"
     _ARISTON_PAR_HEATING_FLOW_OFFSET = "HeatingFlowOffset"
-    _ARISTON_PAR_COOLING_FLOW_TEMP = "CoolingFlowTemp"
-    _ARISTON_PAR_COOLING_FLOW_OFFSET = "CoolingFlowOffset"
     _ARISTON_PAR_DHW_MODE = "DhwMode"
     _ARISTON_PAR_DHW_STORAGE_TEMP = "DhwStorageTemperature"
     _ARISTON_PAR_DHW_COMFORT_TEMP = "DhwTimeProgComfortTemp"
@@ -247,8 +243,6 @@ class AristonHandler:
         _PARAM_CH_ECONOMY_TEMPERATURE: _ARISTON_PAR_ZONE_ECONOMY_TEMP,
         _PARAM_HEATING_FLOW_TEMP: _ARISTON_PAR_HEATING_FLOW_TEMP,
         _PARAM_HEATING_FLOW_OFFSET: _ARISTON_PAR_HEATING_FLOW_OFFSET,
-        _PARAM_COOLING_FLOW_TEMP: _ARISTON_PAR_COOLING_FLOW_TEMP,
-        _PARAM_COOLING_FLOW_OFFSET: _ARISTON_PAR_COOLING_FLOW_OFFSET,
     }
     # Parameters in Web menu, mapping to parameter names
     _MAP_ARISTON_WEB_MENU_PARAMS = {

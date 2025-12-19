@@ -10,15 +10,6 @@ PARAM_CH_COMFORT_TEMPERATURE = "ch_comfort_temperature"
 PARAM_CH_ECONOMY_TEMPERATURE = "ch_economy_temperature"
 PARAM_CH_DETECTED_TEMPERATURE = "ch_detected_temperature"
 PARAM_CH_PROGRAM = "ch_program"
-PARAM_COOLING_LAST_24H = "cooling_last_24h"
-PARAM_COOLING_LAST_7D = "cooling_last_7d"
-PARAM_COOLING_LAST_30D = "cooling_last_30d"
-PARAM_COOLING_LAST_365D = "cooling_last_365d"
-PARAM_COOLING_LAST_24H_LIST = "cooling_last_24h_list"
-PARAM_COOLING_LAST_7D_LIST = "cooling_last_7d_list"
-PARAM_COOLING_LAST_30D_LIST = "cooling_last_30d_list"
-PARAM_COOLING_LAST_365D_LIST = "cooling_last_365d_list"
-PARAM_COOLING_TODAY = "cooling_today"
 PARAM_ERRORS_COUNT = "errors_count"
 PARAM_DHW_COMFORT_FUNCTION = "dhw_comfort_function"
 PARAM_DHW_MODE = "dhw_mode"
@@ -113,8 +104,6 @@ PARAM_DHW_ENERGY_DELTA_THIS_YEAR = 'dhw_energy_delta_this_year'
 PARAM_DHW_ENERGY_DELTA_LAST_YEAR = 'dhw_energy_delta_last_year'
 PARAM_HEATING_FLOW_TEMP = "ch_heating_flow_temp"
 PARAM_HEATING_FLOW_OFFSET = "ch_heating_flow_offset"
-PARAM_COOLING_FLOW_TEMP = "ch_cooling_flow_temp"
-PARAM_COOLING_FLOW_OFFSET = "ch_cooling_flow_offset"
 PARAM_CH_DEROGA_TEMPERATURE = "ch_deroga_temperature"
 PARAM_VERSION = 'integration_version'
 
@@ -128,15 +117,12 @@ ZONED_PARAMS = [
     PARAM_CH_ECONOMY_TEMPERATURE,
     PARAM_HEATING_FLOW_TEMP,
     PARAM_HEATING_FLOW_OFFSET,
-    PARAM_COOLING_FLOW_TEMP,
-    PARAM_COOLING_FLOW_OFFSET,
 ]
 
 VAL_MANUAL = "Manual"
 VAL_PROGRAM = "Time program"
 VAL_WINTER = "Winter"
 VAL_SUMMER = "Summer"
-VAL_COOLING = "Cooling"
 VAL_OFF = "OFF"
 VAL_ON = "ON"
 VAL_OFFLINE = "Offline"

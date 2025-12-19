@@ -31,7 +31,6 @@ from .const import (
     VAL_WINTER,
     VAL_SUMMER,
     VAL_HEATING_ONLY,
-    VAL_COOLING,
     VAL_ON,
     VAL_MANUAL,
     VAL_PROGRAM,
@@ -177,11 +176,6 @@ class AristonThermostat(ClimateEntity):
                     curr_hvac_mode = HVACMode.HEAT
                 elif climate_ch_mode == VAL_PROGRAM:
                     curr_hvac_mode = HVACMode.AUTO
-            if climate_mode and climate_mode in [VAL_COOLING]:
-                if climate_ch_mode == VAL_MANUAL:
-                    curr_hvac_mode = HVACMode.COOL
-                elif climate_ch_mode == VAL_PROGRAM:
-                    curr_hvac_mode = HVACMode.AUTO
         except KeyError:
             return HVACMode.OFF
         return curr_hvac_mode
@@ -194,8 +188,6 @@ class AristonThermostat(ClimateEntity):
             supported_modes = []
             if supported_ch_modes and VAL_MANUAL in supported_ch_modes:
                 supported_modes.append(HVACMode.HEAT)
-                if self._api._features.get("hasTwoCoolingTemp", False) or self._api._features.get("distinctHeatCoolSetpoints", False):
-                    supported_modes.append(HVACMode.COOL)
             if supported_ch_modes and VAL_PROGRAM in supported_ch_modes:
                 supported_modes.append(HVACMode.AUTO)
         except KeyError:
@@ -212,12 +204,6 @@ class AristonThermostat(ClimateEntity):
                 ch_flame = self._api.sensor_values[param_zoned(PARAM_CH_FLAME, self._zone)][VALUE]
                 if ch_flame == VAL_ON:
                     curr_hvac_action = HVACAction.HEATING
-                else:
-                    curr_hvac_action = HVACAction.IDLE
-            if climate_mode in [VAL_COOLING]:
-                ch_flame = self._api.sensor_values[param_zoned(PARAM_CH_FLAME, self._zone)][VALUE]
-                if ch_flame == VAL_ON:
-                    curr_hvac_action = HVACAction.COOLING
                 else:
                     curr_hvac_action = HVACAction.IDLE
         except KeyError:
@@ -281,8 +267,8 @@ class AristonThermostat(ClimateEntity):
             self._api.set_http_data(**{PARAM_MODE: VAL_SUMMER})
         elif hvac_mode == HVACMode.AUTO:
             ch_mode = VAL_PROGRAM
-            if current_mode in [VAL_WINTER, VAL_HEATING_ONLY, VAL_COOLING]:
-                # if already heating or cooling just change CH mode
+            if current_mode in [VAL_WINTER, VAL_HEATING_ONLY]:
+                # if already heating just change CH mode
                 self._api.set_http_data(**{param_zoned(PARAM_CH_MODE, self._zone): ch_mode})
             elif current_mode == VAL_SUMMER:
                 # DHW is working, so use Winter where CH and DHW are active
@@ -304,7 +290,7 @@ class AristonThermostat(ClimateEntity):
             if current_mode in [VAL_WINTER, VAL_HEATING_ONLY]:
                 # if already heating, change CH mode
                 self._api.set_http_data(**{param_zoned(PARAM_CH_MODE, self._zone): ch_mode})
-            elif current_mode in [VAL_SUMMER, VAL_COOLING]:
+            elif current_mode in [VAL_SUMMER]:
                 # DHW is working, so use Winter and change mode
                 self._api.set_http_data(
                     **{PARAM_MODE: VAL_WINTER, param_zoned(PARAM_CH_MODE, self._zone): ch_mode}
@@ -319,9 +305,6 @@ class AristonThermostat(ClimateEntity):
                     self._api.set_http_data(
                         **{PARAM_MODE: VAL_WINTER, param_zoned(PARAM_CH_MODE, self._zone): ch_mode}
                     )
-        elif hvac_mode == HVACMode.COOL:
-            ch_mode = VAL_MANUAL
-            self._api.set_http_data(**{PARAM_MODE: VAL_COOLING, param_zoned(PARAM_CH_MODE, self._zone): ch_mode})
 
     def set_preset_mode(self, preset_mode):
         """Set new target preset mode."""
