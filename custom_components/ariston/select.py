@@ -177,11 +177,24 @@ class AristonSelect(SelectEntity):
                 min_val = self._api.sensor_values[self._select_type][MIN]
                 max_val = self._api.sensor_values[self._select_type][MAX]
                 step_val = self._api.sensor_values[self._select_type][STEP]
+                # Validate numeric step and bounds to avoid infinite loops
+                try:
+                    min_val = float(min_val)
+                    max_val = float(max_val)
+                    step_val = float(step_val)
+                except (TypeError, ValueError):
+                    return []
+                if step_val <= 0 or min_val is None or max_val is None:
+                    return []
                 values = list()
                 value = min_val
-                while value < max_val + .1:
+                # safety cap to prevent infinite looping if data is unexpected
+                max_iters = 10000
+                iters = 0
+                while value < max_val + 0.0001 and iters < max_iters:
                     values.append(str(value))
                     value += step_val
+                    iters += 1
                 return values
             else:
                 return []
