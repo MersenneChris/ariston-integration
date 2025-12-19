@@ -3,7 +3,6 @@ import logging
 from datetime import timedelta
 from copy import deepcopy
 from homeassistant.components.binary_sensor import (
-    BinarySensorDeviceClass,
     BinarySensorEntity,
 )
 from homeassistant.const import CONF_BINARY_SENSORS, CONF_NAME

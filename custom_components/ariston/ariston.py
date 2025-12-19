@@ -61,9 +61,7 @@ class AristonHandler:
     ]
 
     # All sensors names
-    _PARAM_ACCOUNT_CH_GAS = "account_ch_gas"
     _PARAM_ACCOUNT_CH_ELECTRICITY = "account_ch_electricity"
-    _PARAM_ACCOUNT_DHW_GAS = "account_dhw_gas"
     _PARAM_ACCOUNT_DHW_ELECTRICITY = "account_dhw_electricity"
     _PARAM_CH_ANTIFREEZE_TEMPERATURE = "ch_antifreeze_temperature"
     _PARAM_CH_MODE = "ch_mode"
@@ -86,8 +84,6 @@ class AristonHandler:
     _PARAM_SIGNAL_STRENGTH = "signal_strength"
     _PARAM_UNITS = "units"
     _PARAM_THERMAL_CLEANSE_CYCLE = "dhw_thermal_cleanse_cycle"
-    _PARAM_GAS_TYPE = "gas_type"
-    _PARAM_GAS_COST = "gas_cost"
     _PARAM_ELECTRICITY_COST = "electricity_cost"
     _PARAM_CH_AUTO_FUNCTION = "ch_auto_function"
     _PARAM_HEAT_PUMP = "heat_pump"
@@ -102,9 +98,7 @@ class AristonHandler:
     _PARAM_PRESSURE = "pressure"
     _PARAM_CH_FLOW_TEMP = 'ch_flow_temperature'
     _PARAM_CH_FIXED_TEMP = 'ch_fixed_temperature'
-    _PARAM_CH_LAST_MONTH_GAS = 'ch_gas_last_month'
     _PARAM_CH_LAST_MONTH_ELECTRICITY = 'ch_electricity_last_month'
-    _PARAM_DHW_LAST_MONTH_GAS = 'dhw_gas_last_month'
     _PARAM_DHW_LAST_MONTH_ELECTRICITY = 'dhw_electricity_last_month'
     _PARAM_CH_ENERGY_TODAY = 'ch_energy_today'
     _PARAM_CH_ENERGY_YESTERDAY = 'ch_energy_yesterday'
@@ -290,9 +284,7 @@ class AristonHandler:
     ]
     # Sensors in last month energy
     _LIST_LAST_MONTH = [
-        _PARAM_CH_LAST_MONTH_GAS,
         _PARAM_CH_LAST_MONTH_ELECTRICITY,
-        _PARAM_DHW_LAST_MONTH_GAS,
         _PARAM_DHW_LAST_MONTH_ELECTRICITY,
     ]
     # Energy data
@@ -1131,26 +1123,16 @@ class AristonHandler:
         elif request_type == self._REQUEST_LAST_MONTH:
 
             self._last_month_data = copy.deepcopy(resp.json())
-            self._reset_sensor(self._PARAM_CH_LAST_MONTH_GAS)
             self._reset_sensor(self._PARAM_CH_LAST_MONTH_ELECTRICITY)
-            self._reset_sensor(self._PARAM_DHW_LAST_MONTH_GAS)
             self._reset_sensor(self._PARAM_DHW_LAST_MONTH_ELECTRICITY)
             for item in self._last_month_data["LastMonth"]:
                 try:
                     if item["use"] == 1:
-                        if "gas" in item:
-                            sensor = self._PARAM_CH_LAST_MONTH_GAS
-                            self._ariston_sensors[sensor][self._VALUE] = item["gas"]
-                            self._ariston_sensors[sensor][self._UNITS] = self._UNIT_KWH
                         if "elect" in item:
                             sensor = self._PARAM_CH_LAST_MONTH_ELECTRICITY
                             self._ariston_sensors[sensor][self._VALUE] = item["elect"]
                             self._ariston_sensors[sensor][self._UNITS] = self._UNIT_KWH
                     if item["use"] == 2:
-                        if "gas" in item:
-                            sensor = self._PARAM_DHW_LAST_MONTH_GAS
-                            self._ariston_sensors[sensor][self._VALUE] = item["gas"]
-                            self._ariston_sensors[sensor][self._UNITS] = self._UNIT_KWH
                         if "elect" in item:
                             sensor = self._PARAM_DHW_LAST_MONTH_ELECTRICITY
                             self._ariston_sensors[sensor][self._VALUE] = item["elect"]
