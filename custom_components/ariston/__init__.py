@@ -143,15 +143,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         update_list(sensors)
         update_list(selectors)
     
-    # Store device
-    hass.data[DATA_ARISTON][DEVICES][name] = AristonDevice(api, entry.data)
-    _LOGGER.info("Stored Ariston device: %s", name)
-    
     # Forward entry setup to platforms
     _LOGGER.info("Forwarding entry to platforms: %s", ", ".join(p.value for p in PLATFORMS))
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    try:
+        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    except Exception:  # If platform setup fails, stop API and clean up
+        _LOGGER.exception("Error while forwarding entry setups for %s, stopping API and aborting setup", name)
+        try:
+            api.ariston_api.stop()
+        except Exception:
+            _LOGGER.debug("Failed to stop Ariston API during cleanup for %s", name)
+        return False
     _LOGGER.info("Platforms setup forwarded for %s", name)
-    
+
+    # Store device only after platforms were successfully set up
+    hass.data[DATA_ARISTON][DEVICES][name] = AristonDevice(api, entry.data)
+    _LOGGER.info("Stored Ariston device: %s", name)
+
     # Register service
     async def set_ariston_data(call: ServiceCall):
         """Handle the service call to set the data."""
@@ -159,7 +167,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
         try:
             domain = entity_id.split(".")[0]
-        except:
+        except Exception:
             _LOGGER.warning("Invalid entity_id domain for Ariston")
             raise Exception("Invalid entity_id domain for Ariston")
         if domain.lower() not in {"climate", "water_heater"}:
@@ -167,7 +175,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             raise Exception("Invalid entity_id domain for Ariston")
         try:
             device_id = entity_id.split(".")[1]
-        except:
+        except Exception:
             _LOGGER.warning("Invalid entity_id device for Ariston")
             raise Exception("Invalid entity_id device for Ariston")
 
@@ -205,14 +213,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
             await hass.async_add_executor_job(api.ariston_api.set_http_data, **parameter_list)
             return
-        
+
         raise Exception("Corresponding entity_id for Ariston not found")
-    
+
     hass.services.async_register(DOMAIN, SERVICE_SET_DATA, set_ariston_data)
-    
+
     # Register update listener for options
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))
-    
+
     return True
 
 
