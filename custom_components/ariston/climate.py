@@ -27,6 +27,7 @@ from .const import (
     PARAM_MODE,
     PARAM_CH_SET_TEMPERATURE,
     PARAM_CH_DETECTED_TEMPERATURE,
+    PARAM_HEAT_PUMP,
     PARAM_HOLIDAY_MODE,
     VAL_WINTER,
     VAL_SUMMER,
@@ -52,9 +53,11 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up Ariston climate from a config entry."""
+    _LOGGER.warning("climate.async_setup_entry called - starting climate setup")
     name = entry.data.get(CONF_NAME, "Ariston")
     device = hass.data[DATA_ARISTON][DEVICES][name]
     num_ch_zones = entry.options.get("num_ch_zones", 1)
+    _LOGGER.warning("climate.async_setup_entry - name=%s, num_ch_zones=%d", name, num_ch_zones)
     
     climates = []
     for zone in range(1, num_ch_zones + 1):
@@ -65,18 +68,21 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
 
 def setup_platform(hass, config, add_entities, discovery_info=None):
-    """Setup the Ariston Platform."""
+    """Setup the Ariston Platform (legacy - deprecated)."""
+    # This is deprecated - use async_setup_entry instead
     if discovery_info is None:
         return
-    name = discovery_info[CONF_NAME]
+    _LOGGER.warning("Legacy setup_platform called for climate - should use async_setup_entry instead")
+    name = discovery_info.get(CONF_NAME)
+    if not name or name not in hass.data[DATA_ARISTON][DEVICES]:
+        return
     device = hass.data[DATA_ARISTON][DEVICES][name]
-    add_entities(
-        [
-            AristonThermostat(name, device, climate_name)
-            for climate_name in discovery_info[CONF_CLIMATES]
-        ],
-        True,
-    )
+    num_ch_zones = discovery_info.get("num_ch_zones", 1)
+    climates = []
+    for zone in range(1, num_ch_zones + 1):
+        climate_name = f"{name} Zone{zone}"
+        climates.append(AristonThermostat(name, device, climate_name))
+    add_entities(climates, True)
 
 class AristonThermostat(ClimateEntity):
     """Representation of a Ariston Thermostat."""
@@ -201,8 +207,8 @@ class AristonThermostat(ClimateEntity):
             curr_hvac_action = HVACAction.OFF
             climate_mode = self._api.sensor_values[PARAM_MODE][VALUE]
             if climate_mode in [VAL_WINTER, VAL_HEATING_ONLY]:
-                ch_flame = self._api.sensor_values[param_zoned(PARAM_CH_FLAME, self._zone)][VALUE]
-                if ch_flame == VAL_ON:
+                heat_pump_on = self._api.sensor_values[PARAM_HEAT_PUMP][VALUE]
+                if heat_pump_on == VAL_ON:
                     curr_hvac_action = HVACAction.HEATING
                 else:
                     curr_hvac_action = HVACAction.IDLE
