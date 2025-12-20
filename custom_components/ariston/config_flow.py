@@ -76,6 +76,75 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Get the options flow for this handler."""
         return AristonOptionsFlowHandler(config_entry)
 
+    async def async_step_reconfigure(self, user_input=None):
+        """Handle reconfigure step when settings cog is clicked."""
+        config_entry = self.hass.config_entries.async_get_entry(
+            self.context["entry_id"]
+        )
+        if config_entry is None:
+            return self.async_abort(reason="reconfigure_failed")
+        
+        # Redirect to options flow
+        return self.async_show_form(
+            step_id="reconfigure_confirm",
+            data_schema=self._get_reconfigure_schema(config_entry),
+            description_placeholders={
+                "username": config_entry.data.get(CONF_USERNAME, "")
+            }
+        )
+
+    async def async_step_reconfigure_confirm(self, user_input=None):
+        """Handle reconfigure confirmation."""
+        config_entry = self.hass.config_entries.async_get_entry(
+            self.context["entry_id"]
+        )
+        if config_entry is None:
+            return self.async_abort(reason="reconfigure_failed")
+        
+        if user_input is not None:
+            self.hass.config_entries.async_update_entry(
+                config_entry, 
+                options=user_input
+            )
+            await self.hass.config_entries.async_reload(config_entry.entry_id)
+            return self.async_abort(reason="reconfigure_successful")
+
+        return self.async_show_form(
+            step_id="reconfigure_confirm",
+            data_schema=self._get_reconfigure_schema(config_entry),
+            description_placeholders={
+                "username": config_entry.data.get(CONF_USERNAME, "")
+            }
+        )
+
+    def _get_reconfigure_schema(self, config_entry):
+        """Get schema for reconfigure flow."""
+        options = config_entry.options
+        return vol.Schema(
+            {
+                vol.Optional(
+                    CONF_PERIOD_GET,
+                    default=options.get(CONF_PERIOD_GET, DEFAULT_PERIOD_GET),
+                ): vol.All(int, vol.Range(min=30, max=3600)),
+                vol.Optional(
+                    CONF_PERIOD_SET,
+                    default=options.get(CONF_PERIOD_SET, DEFAULT_PERIOD_SET),
+                ): vol.All(int, vol.Range(min=30, max=3600)),
+                vol.Optional(
+                    CONF_MAX_SET_RETRIES,
+                    default=options.get(CONF_MAX_SET_RETRIES, DEFAULT_MAX_RETRIES),
+                ): vol.All(int, vol.Range(min=1, max=10)),
+                vol.Optional(
+                    CONF_LOG,
+                    default=options.get(CONF_LOG, config_entry.data.get(CONF_LOG, DEFAULT_LOG)),
+                ): vol.In(["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"]),
+                vol.Optional(
+                    CONF_CH_ZONES,
+                    default=options.get(CONF_CH_ZONES, DEFAULT_CH_ZONES),
+                ): vol.All(int, vol.Range(min=1, max=6)),
+            }
+        )
+
 
 class AristonOptionsFlowHandler(config_entries.OptionsFlow):
     """Handle options flow for Ariston."""

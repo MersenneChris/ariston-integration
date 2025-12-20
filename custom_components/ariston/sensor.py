@@ -169,7 +169,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     
     # Filter sensors to only those available in the API
     api = device.api.ariston_api
-    sensors = [s for s in sensors_default.keys() if s in api.sensor_values]
+    sensors = [s for s in SENSORS.keys() if s in api.sensor_values]
     _LOGGER.info("Adding %d sensors for %s (available in API: %d)", len(sensors), name, len(api.sensor_values))
     
     async_add_entities(
