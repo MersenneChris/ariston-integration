@@ -194,6 +194,7 @@ class AristonHandler:
     # Ariston parameters in Android api
     _ARISTON_PAR_PRESSURE = 'HeatingCircuitPressure'
     _ARISTON_PAR_CH_FLOW_TEMP = 'ChFlowSetpointTemp'
+    _ARISTON_PAR_CH_ANTIFREEZE_TEMP = 'ChAntiFreezeTemp'
     _ARISTON_PAR_OUTSIDE_TEMP = 'OutsideTemp'
     _ARISTON_PAR_WEATHER = 'Weather'
     _ARISTON_PAR_PLANT_MODE = 'PlantMode'
@@ -220,6 +221,7 @@ class AristonHandler:
     # Parameters in Android api within zone 0, mapping to parameter names
     _MAP_ARISTON_ZONE_0_PARAMS = {
         _PARAM_CH_FLOW_TEMP: _ARISTON_PAR_CH_FLOW_TEMP,
+        _PARAM_CH_ANTIFREEZE_TEMPERATURE: _ARISTON_PAR_CH_ANTIFREEZE_TEMP,
         _PARAM_PRESSURE: _ARISTON_PAR_PRESSURE,
         _PARAM_OUTSIDE_TEMPERATURE: _ARISTON_PAR_OUTSIDE_TEMP,
         _PARAM_WEATHER: _ARISTON_PAR_WEATHER,
