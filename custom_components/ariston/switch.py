@@ -1,4 +1,5 @@
 """Suppoort for Ariston switch."""
+import logging
 from datetime import timedelta
 from copy import deepcopy
 from homeassistant.components.switch import SwitchEntity
@@ -18,6 +19,8 @@ from .const import (
     VAL_ON,
     ZONED_PARAMS
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 SWITCH_CH_AUTO_FUNCTION = "CH Auto Function"
 SWITCH_INTERNET_TIME = "Internet Time"
