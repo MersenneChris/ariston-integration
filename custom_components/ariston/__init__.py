@@ -109,7 +109,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         logging=logging_level,
         period_set=period_set,
         period_get=period_get,
-        retries=max_retries
+        retries=max_retries,
+        num_ch_zones=num_ch_zones,
     )
     
     # Start api execution
@@ -191,7 +192,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             set_zoned_params = []
             for param in params_to_set:
                 if param in ZONED_PARAMS:
-                    for zone in range(1, 7):
+                    for zone in range(1, num_ch_zones + 1):
                         set_zoned_params.append(param_zoned(param, zone))
                 else:
                     set_zoned_params.append(param)
@@ -256,13 +257,15 @@ class AristonChecker:
         gw,
         period_set,
         period_get,
-        retries
+        retries,
+        num_ch_zones=1
     ):
         """Initialize."""
 
         self.device = device
         self._hass = hass
         self.name = name
+        self.num_ch_zones = num_ch_zones
 
         if not sensors:
             sensors = list()
@@ -288,7 +291,8 @@ class AristonChecker:
             gw=gw,
             set_max_retries=retries,
             period_get_request=period_get,
-            period_set_request=period_set
+            period_set_request=period_set,
+            max_zones=num_ch_zones,
         )
 
 

@@ -482,6 +482,7 @@ class AristonHandler:
                  period_set_request: int = _SET_SENSORS_PERIOD_SECONDS,
                  set_max_retries: int = _MAX_RETRIES,
                  gw: str = "",
+                 max_zones: int = 6,
                  ) -> None:
         """
         Initialize API.
@@ -515,6 +516,11 @@ class AristonHandler:
         self._console_handler.setFormatter(self._formatter)
         self._LOGGER.addHandler(self._console_handler)
 
+        if not isinstance(max_zones, int) or max_zones < 1 or max_zones > 6:
+            raise Exception("max_zones must be between 1 and 6")
+
+        self._max_zones = max_zones
+
         if sensors:
             for sensor in sensors:
                 if sensor not in self._SENSOR_LIST:
@@ -533,7 +539,7 @@ class AristonHandler:
         self._subscribed_sensors_old_value = dict()
         for sensor in self._SENSOR_LIST:
             if sensor in self._MAP_ARISTON_MULTIZONE_PARAMS:
-                for zone in range(1, 7):
+                for zone in range(1, self._max_zones + 1):
                     ch_sensor = self._zone_sensor_name(sensor, zone=zone)
                     self._reset_sensor(ch_sensor)
                     self._subscribed_sensors_old_value[ch_sensor] = None
@@ -933,7 +939,12 @@ class AristonHandler:
                 with self._plant_id_lock:
                     self._features = copy.deepcopy(features)
                     if self._features["zones"]:
-                        self._zones = [item["num"] for item in self._features["zones"]]
+                        zones = [item["num"] for item in self._features["zones"] if item["num"] <= self._max_zones]
+                        if not zones:
+                            zones = list(range(1, self._max_zones + 1))
+                        self._zones = zones
+                    if not self._zones:
+                        self._zones = list(range(1, self._max_zones + 1))
                     self._plant_id = plant_id
                     self._gw_name = plant_id + '_'
                     self._login = True
@@ -1013,6 +1024,9 @@ class AristonHandler:
                     original_sensor = self._MAP_ARISTON_API_TO_PARAM[item["id"]]
                     zone = item["zone"]
                     sensor = self._zone_sensor_name(original_sensor, zone=zone)
+                    # Skip zones beyond configured limit
+                    if zone > self._max_zones:
+                        continue
                     # Create sensor if it doesn't exist yet (dynamically detected zones)
                     if sensor not in self._ariston_sensors:
                         self._reset_sensor(sensor)
