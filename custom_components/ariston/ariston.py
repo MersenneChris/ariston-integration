@@ -1013,7 +1013,10 @@ class AristonHandler:
                     original_sensor = self._MAP_ARISTON_API_TO_PARAM[item["id"]]
                     zone = item["zone"]
                     sensor = self._zone_sensor_name(original_sensor, zone=zone)
-                    self._ariston_sensors[sensor]
+                    # Create sensor if it doesn't exist yet (dynamically detected zones)
+                    if sensor not in self._ariston_sensors:
+                        self._reset_sensor(sensor)
+                        self._subscribed_sensors_old_value[sensor] = None
                     try:
                         self._ariston_sensors[sensor][self._VALUE] = self._get_visible_sensor_value(sensor)
                         if "min" in item:
