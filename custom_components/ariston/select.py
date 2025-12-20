@@ -17,7 +17,6 @@ from .const import (
     PARAM_CH_MODE,
     PARAM_DHW_MODE,
     PARAM_DHW_COMFORT_FUNCTION,
-    PARAM_UNITS,
     VALUE,
     OPTIONS_TXT,
     MIN,

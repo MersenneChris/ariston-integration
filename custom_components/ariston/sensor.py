@@ -34,7 +34,6 @@ from .const import (
     PARAM_MODE,
     PARAM_OUTSIDE_TEMPERATURE,
     PARAM_SIGNAL_STRENGTH,
-    PARAM_UNITS,
     PARAM_THERMAL_CLEANSE_CYCLE,
     PARAM_DHW_PROGRAM,
     PARAM_CH_FLOW_TEMP,
@@ -88,7 +87,6 @@ SENSOR_ERRORS = "Active Errors"
 SENSOR_MODE = "Mode"
 SENSOR_OUTSIDE_TEMPERATURE = "Outside Temperature"
 SENSOR_SIGNAL_STRENGTH = "Signal Strength"
-SENSOR_UNITS = "Units of Measurement"
 SENSOR_THERMAL_CLEANSE_CYCLE = "Thermal Cleanse Cycle"
 SENSOR_ELECTRICITY_COST = "Electricity Cost"
 SENSOR_CH_ENERGY2_TODAY = 'CH energy 2 today'
@@ -131,7 +129,6 @@ sensors_default = {
     PARAM_MODE: [SENSOR_MODE, None, "mdi:water-boiler", None],
     PARAM_OUTSIDE_TEMPERATURE: [SENSOR_OUTSIDE_TEMPERATURE, SensorDeviceClass.TEMPERATURE, "mdi:thermometer", None],
     PARAM_SIGNAL_STRENGTH: [SENSOR_SIGNAL_STRENGTH, SensorDeviceClass.SIGNAL_STRENGTH, "mdi:signal", None],
-    PARAM_UNITS: [SENSOR_UNITS, None, "mdi:scale-balance", None],
     PARAM_THERMAL_CLEANSE_CYCLE: [SENSOR_THERMAL_CLEANSE_CYCLE, None, "mdi:update", None],
     PARAM_CH_ENERGY2_TODAY: [SENSOR_CH_ENERGY2_TODAY, SensorDeviceClass.ENERGY, "mdi:cash", SensorStateClass.TOTAL_INCREASING],
     PARAM_DHW_ENERGY2_TODAY: [SENSOR_DHW_ENERGY2_TODAY, SensorDeviceClass.ENERGY, "mdi:cash", SensorStateClass.TOTAL_INCREASING],
