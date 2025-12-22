@@ -1,6 +1,8 @@
 """Support for Ariston."""
 import logging
 import re
+import calendar
+from datetime import datetime, timedelta
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
@@ -210,6 +212,50 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         raise Exception("Corresponding entity_id for Ariston not found")
     
     hass.services.async_register(DOMAIN, SERVICE_SET_DATA, set_ariston_data)
+    
+    # One-off service to calibrate a daily utility meter by subtracting yesterday 22:00 block
+    async def calibrate_daily_meter(call: ServiceCall):
+        """Calibrate a utility meter to today's corrected value.
+        Expected data:
+          - meter_entity_id: utility_meter entity to calibrate
+          - source_entity_id: sensor entity providing today's cumulative value with hourly attributes
+          - yesterday_hour (optional): hour to subtract from yesterday (default 22)
+        """
+        meter_entity_id = call.data.get("meter_entity_id")
+        source_entity_id = call.data.get("source_entity_id")
+        yesterday_hour = int(call.data.get("yesterday_hour", 22))
+
+        if not meter_entity_id or not source_entity_id:
+            raise Exception("meter_entity_id and source_entity_id are required")
+
+        source_state = hass.states.get(source_entity_id)
+        if not source_state or source_state.state in {"unknown", "unavailable"}:
+            raise Exception(f"Source entity {source_entity_id} is not available")
+
+        try:
+            source_value = float(source_state.state)
+        except (TypeError, ValueError):
+            raise Exception(f"Source entity {source_entity_id} state is not numeric: {source_state.state}")
+
+        today = datetime.now()
+        y = today - timedelta(days=1)
+        key = f"{y.year}_{calendar.month_abbr[y.month]}_{y.day:02}_{yesterday_hour:02}"
+        y22_val = 0.0
+        try:
+            y22_val = float(source_state.attributes.get(key, 0.0))
+        except (TypeError, ValueError):
+            y22_val = 0.0
+
+        corrected = max(source_value - y22_val, 0.0)
+
+        await hass.services.async_call(
+            "utility_meter",
+            "calibrate",
+            {"entity_id": meter_entity_id, "value": corrected},
+            blocking=True,
+        )
+
+    hass.services.async_register(DOMAIN, "calibrate_daily_meter", calibrate_daily_meter)
     
     # Register update listener for options
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))

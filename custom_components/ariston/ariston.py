@@ -1482,26 +1482,28 @@ class AristonHandler:
                             use_day, use_month, use_year = prev_day, prev_month, prev_year
                             prev_day, prev_month, prev_year = prev_day_2, prev_month_2, prev_year_2
                             midnight = False
-                        
+
+                        # Determine if this first slot after midnight belongs to previous day (22-00)
+                        assign_to_prev_day = midnight and scan_2hour == 0 and scan_break == 0
+
                         # Apply 2-hour offset: timestamp represents start of period, not end
                         # scan_2hour is the end of the period, subtract 2 to get the start
                         store_hour = scan_2hour - 2
-                        store_day, store_month, store_year = use_day, use_month, use_year
+                        store_day, store_month, store_year = (prev_day, prev_month, prev_year) if assign_to_prev_day else (use_day, use_month, use_year)
                         if store_hour < 0:
                             # Hour wraps to previous day (22:00)
                             store_hour = 22
-                            store_day, store_month, store_year, _ = self._get_prev_day(day=use_day, month=use_month, year=use_year, scan_break=0)
-                        
-                        if scan_break == 0:
+                            # wrap relative to the selected base day
+                            base_day, base_month, base_year = store_day, store_month, store_year
+                            store_day, store_month, store_year, _ = self._get_prev_day(day=base_day, month=base_month, year=base_year, scan_break=0)
+
+                        if assign_to_prev_day:
+                            energy_yesterday_attr[hour_text.format(store_year, calendar.month_abbr[store_month], store_day, store_hour)] = value
+                            energy_yesterday += value
+                        elif scan_break == 0:
                             energy_today_attr[hour_text.format(store_year, calendar.month_abbr[store_month], store_day, store_hour)] = value
                             energy_today += value
                         elif scan_break == 1:
-                            # For yesterday, also apply the 2-hour offset
-                            store_hour = scan_2hour - 2
-                            store_day, store_month, store_year = prev_day, prev_month, prev_year
-                            if store_hour < 0:
-                                store_hour = 22
-                                store_day, store_month, store_year, _ = self._get_prev_day(day=prev_day, month=prev_month, year=prev_year, scan_break=0)
                             energy_yesterday_attr[hour_text.format(store_year, calendar.month_abbr[store_month], store_day, store_hour)] = value
                             energy_yesterday += value
                 if item['p'] == 2:
