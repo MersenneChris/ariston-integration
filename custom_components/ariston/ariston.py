@@ -1476,12 +1476,6 @@ class AristonHandler:
                         midnight = False
                     for value in reversed(item['v']):
                         scan_2hour, scan_break = self._get_prev_hour(hour=scan_2hour, scan_break=scan_break)
-                        if midnight and scan_break == 1:
-                            # ignore first break
-                            scan_break = 0
-                            use_day, use_month, use_year = prev_day, prev_month, prev_year
-                            prev_day, prev_month, prev_year = prev_day_2, prev_month_2, prev_year_2
-                            midnight = False
 
                         # Determine if this first slot after midnight belongs to previous day (22-00)
                         assign_to_prev_day = midnight and scan_2hour == 0 and scan_break == 0
@@ -1489,23 +1483,27 @@ class AristonHandler:
                         # Apply 2-hour offset: timestamp represents start of period, not end
                         # scan_2hour is the end of the period, subtract 2 to get the start
                         store_hour = scan_2hour - 2
-                        store_day, store_month, store_year = (prev_day, prev_month, prev_year) if assign_to_prev_day else (use_day, use_month, use_year)
+                        store_day, store_month, store_year = use_day, use_month, use_year
+                        day_offset = scan_break
+                        if assign_to_prev_day:
+                            day_offset = max(day_offset, 1)
+
                         if store_hour < 0:
                             # Hour wraps to previous day (22:00)
                             store_hour = 22
-                            # wrap relative to the selected base day
-                            base_day, base_month, base_year = store_day, store_month, store_year
-                            store_day, store_month, store_year, _ = self._get_prev_day(day=base_day, month=base_month, year=base_year, scan_break=0)
+                            if not assign_to_prev_day:
+                                day_offset += 1
 
-                        if assign_to_prev_day:
+                        # Shift the attribute date back by the accumulated offset so hours stay with the correct day
+                        for _ in range(day_offset):
+                            store_day, store_month, store_year, _ = self._get_prev_day(day=store_day, month=store_month, year=store_year, scan_break=0)
+
+                        if day_offset > 0:
                             energy_yesterday_attr[hour_text.format(store_year, calendar.month_abbr[store_month], store_day, store_hour)] = value
                             energy_yesterday += value
-                        elif scan_break == 0:
+                        else:
                             energy_today_attr[hour_text.format(store_year, calendar.month_abbr[store_month], store_day, store_hour)] = value
                             energy_today += value
-                        elif scan_break == 1:
-                            energy_yesterday_attr[hour_text.format(store_year, calendar.month_abbr[store_month], store_day, store_hour)] = value
-                            energy_yesterday += value
                 if item['p'] == 2:
                     for value in reversed(item['v']):
                         scan_day, scan_month, scan_year, _ = self._get_prev_day(day=scan_day, month=scan_month, year=scan_year, scan_break=0)
