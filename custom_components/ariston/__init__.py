@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.const import (
     ATTR_ENTITY_ID,
     CONF_NAME,
@@ -226,16 +227,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         yesterday_hour = int(call.data.get("yesterday_hour", 22))
 
         if not meter_entity_id or not source_entity_id:
-            raise Exception("meter_entity_id and source_entity_id are required")
+            raise HomeAssistantError("meter_entity_id and source_entity_id are required")
+
+        if not hass.services.has_service("utility_meter", "calibrate"):
+            raise HomeAssistantError("utility_meter.calibrate service is not available")
+
+        meter_state = hass.states.get(meter_entity_id)
+        if not meter_state:
+            raise HomeAssistantError(f"Meter entity {meter_entity_id} is not available")
 
         source_state = hass.states.get(source_entity_id)
         if not source_state or source_state.state in {"unknown", "unavailable"}:
-            raise Exception(f"Source entity {source_entity_id} is not available")
+            raise HomeAssistantError(f"Source entity {source_entity_id} is not available")
 
         try:
             source_value = float(source_state.state)
         except (TypeError, ValueError):
-            raise Exception(f"Source entity {source_entity_id} state is not numeric: {source_state.state}")
+            raise HomeAssistantError(
+                f"Source entity {source_entity_id} state is not numeric: {source_state.state}"
+            )
 
         today = datetime.now()
         y = today - timedelta(days=1)
@@ -248,12 +258,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
         corrected = max(source_value - y22_val, 0.0)
 
-        await hass.services.async_call(
-            "utility_meter",
-            "calibrate",
-            {"entity_id": meter_entity_id, "value": corrected},
-            blocking=True,
-        )
+        try:
+            await hass.services.async_call(
+                "utility_meter",
+                "calibrate",
+                {"entity_id": meter_entity_id, "value": corrected},
+                blocking=True,
+            )
+        except Exception as exc:
+            _LOGGER.error(
+                "Failed to calibrate %s from %s using key %s (corrected=%s): %s",
+                meter_entity_id,
+                source_entity_id,
+                key,
+                corrected,
+                exc,
+            )
+            raise HomeAssistantError(
+                f"Calibration failed: {exc}" if str(exc) else "Calibration failed"
+            )
 
     hass.services.async_register(DOMAIN, "calibrate_daily_meter", calibrate_daily_meter)
     
