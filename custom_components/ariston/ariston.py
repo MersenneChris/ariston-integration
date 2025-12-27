@@ -101,47 +101,9 @@ class AristonHandler:
     _PARAM_CH_LAST_MONTH_ELECTRICITY = 'ch_electricity_last_month'
     _PARAM_DHW_LAST_MONTH_ELECTRICITY = 'dhw_electricity_last_month'
     _PARAM_CH_ENERGY_TODAY = 'ch_energy_today'
-    _PARAM_CH_ENERGY_YESTERDAY = 'ch_energy_yesterday'
     _PARAM_DHW_ENERGY_TODAY = 'dhw_energy_today'
-    _PARAM_DHW_ENERGY_YESTERDAY = 'dhw_energy_yesterday'
-    _PARAM_CH_ENERGY_LAST_7_DAYS = 'ch_energy_last_7_days'
-    _PARAM_DHW_ENERGY_LAST_7_DAYS = 'dhw_energy_last_7_days'
-    _PARAM_CH_ENERGY_THIS_MONTH = 'ch_energy_this_month'
-    _PARAM_CH_ENERGY_LAST_MONTH = 'ch_energy_last_month'
-    _PARAM_DHW_ENERGY_THIS_MONTH = 'dhw_energy_this_month'
-    _PARAM_DHW_ENERGY_LAST_MONTH = 'dhw_energy_last_month'
-    _PARAM_CH_ENERGY_THIS_YEAR = 'ch_energy_this_year'
-    _PARAM_CH_ENERGY_LAST_YEAR = 'ch_energy_last_year'
-    _PARAM_DHW_ENERGY_THIS_YEAR = 'dhw_energy_this_year'
-    _PARAM_DHW_ENERGY_LAST_YEAR = 'dhw_energy_last_year'
     _PARAM_CH_ENERGY2_TODAY = 'ch_energy2_today'
-    _PARAM_CH_ENERGY2_YESTERDAY = 'ch_energy2_yesterday'
     _PARAM_DHW_ENERGY2_TODAY = 'dhw_energy2_today'
-    _PARAM_DHW_ENERGY2_YESTERDAY = 'dhw_energy2_yesterday'
-    _PARAM_CH_ENERGY2_LAST_7_DAYS = 'ch_energy2_last_7_days'
-    _PARAM_DHW_ENERGY2_LAST_7_DAYS = 'dhw_energy2_last_7_days'
-    _PARAM_CH_ENERGY2_THIS_MONTH = 'ch_energy2_this_month'
-    _PARAM_CH_ENERGY2_LAST_MONTH = 'ch_energy2_last_month'
-    _PARAM_DHW_ENERGY2_THIS_MONTH = 'dhw_energy2_this_month'
-    _PARAM_DHW_ENERGY2_LAST_MONTH = 'dhw_energy2_last_month'
-    _PARAM_CH_ENERGY2_THIS_YEAR = 'ch_energy2_this_year'
-    _PARAM_CH_ENERGY2_LAST_YEAR = 'ch_energy2_last_year'
-    _PARAM_DHW_ENERGY2_THIS_YEAR = 'dhw_energy2_this_year'
-    _PARAM_DHW_ENERGY2_LAST_YEAR = 'dhw_energy2_last_year'
-    _PARAM_CH_ENERGY_DELTA_TODAY = 'ch_energy_delta_today'
-    _PARAM_CH_ENERGY_DELTA_YESTERDAY = 'ch_energy_delta_yesterday'
-    _PARAM_DHW_ENERGY_DELTA_TODAY = 'dhw_energy_delta_today'
-    _PARAM_DHW_ENERGY_DELTA_YESTERDAY = 'dhw_energy_delta_yesterday'
-    _PARAM_CH_ENERGY_DELTA_LAST_7_DAYS = 'ch_energy_delta_last_7_days'
-    _PARAM_DHW_ENERGY_DELTA_LAST_7_DAYS = 'dhw_energy_delta_last_7_days'
-    _PARAM_CH_ENERGY_DELTA_THIS_MONTH = 'ch_energy_delta_this_month'
-    _PARAM_CH_ENERGY_DELTA_LAST_MONTH = 'ch_energy_delta_last_month'
-    _PARAM_DHW_ENERGY_DELTA_THIS_MONTH = 'dhw_energy_delta_this_month'
-    _PARAM_DHW_ENERGY_DELTA_LAST_MONTH = 'dhw_energy_delta_last_month'
-    _PARAM_CH_ENERGY_DELTA_THIS_YEAR = 'ch_energy_delta_this_year'
-    _PARAM_CH_ENERGY_DELTA_LAST_YEAR = 'ch_energy_delta_last_year'
-    _PARAM_DHW_ENERGY_DELTA_THIS_YEAR = 'dhw_energy_delta_this_year'
-    _PARAM_DHW_ENERGY_DELTA_LAST_YEAR = 'dhw_energy_delta_last_year'
     _PARAM_HEATING_FLOW_TEMP = "ch_heating_flow_temp"
     _PARAM_HEATING_FLOW_OFFSET = "ch_heating_flow_offset"
 
@@ -283,50 +245,12 @@ class AristonHandler:
         _PARAM_CH_LAST_MONTH_ELECTRICITY,
         _PARAM_DHW_LAST_MONTH_ELECTRICITY,
     ]
-    # Energy data
+    # Energy data - only tracking today's energy
     _LIST_ENERGY = [
         _PARAM_CH_ENERGY_TODAY,
-        _PARAM_CH_ENERGY_YESTERDAY,
         _PARAM_DHW_ENERGY_TODAY,
-        _PARAM_DHW_ENERGY_YESTERDAY,
-        _PARAM_CH_ENERGY_LAST_7_DAYS,
-        _PARAM_DHW_ENERGY_LAST_7_DAYS,
-        _PARAM_CH_ENERGY_THIS_MONTH,
-        _PARAM_CH_ENERGY_LAST_MONTH,
-        _PARAM_DHW_ENERGY_THIS_MONTH,
-        _PARAM_DHW_ENERGY_LAST_MONTH,
-        _PARAM_CH_ENERGY_THIS_YEAR,
-        _PARAM_CH_ENERGY_LAST_YEAR,
-        _PARAM_DHW_ENERGY_THIS_YEAR,
-        _PARAM_DHW_ENERGY_LAST_YEAR,
         _PARAM_CH_ENERGY2_TODAY,
-        _PARAM_CH_ENERGY2_YESTERDAY,
         _PARAM_DHW_ENERGY2_TODAY,
-        _PARAM_DHW_ENERGY2_YESTERDAY,
-        _PARAM_CH_ENERGY2_LAST_7_DAYS,
-        _PARAM_DHW_ENERGY2_LAST_7_DAYS,
-        _PARAM_CH_ENERGY2_THIS_MONTH,
-        _PARAM_CH_ENERGY2_LAST_MONTH,
-        _PARAM_DHW_ENERGY2_THIS_MONTH,
-        _PARAM_DHW_ENERGY2_LAST_MONTH,
-        _PARAM_CH_ENERGY2_THIS_YEAR,
-        _PARAM_CH_ENERGY2_LAST_YEAR,
-        _PARAM_DHW_ENERGY2_THIS_YEAR,
-        _PARAM_DHW_ENERGY2_LAST_YEAR,
-        _PARAM_CH_ENERGY_DELTA_TODAY,
-        _PARAM_CH_ENERGY_DELTA_YESTERDAY,
-        _PARAM_DHW_ENERGY_DELTA_TODAY,
-        _PARAM_DHW_ENERGY_DELTA_YESTERDAY,
-        _PARAM_CH_ENERGY_DELTA_LAST_7_DAYS,
-        _PARAM_DHW_ENERGY_DELTA_LAST_7_DAYS,
-        _PARAM_CH_ENERGY_DELTA_THIS_MONTH,
-        _PARAM_CH_ENERGY_DELTA_LAST_MONTH,
-        _PARAM_DHW_ENERGY_DELTA_THIS_MONTH,
-        _PARAM_DHW_ENERGY_DELTA_LAST_MONTH,
-        _PARAM_CH_ENERGY_DELTA_THIS_YEAR,
-        _PARAM_CH_ENERGY_DELTA_LAST_YEAR,
-        _PARAM_DHW_ENERGY_DELTA_THIS_YEAR,
-        _PARAM_DHW_ENERGY_DELTA_LAST_YEAR,
     ]
 
     # reverse mapping of Android api to sensor names
