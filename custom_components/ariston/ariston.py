@@ -1208,21 +1208,20 @@ class AristonHandler:
                         # Determine if this first slot after midnight belongs to previous day (22-00)
                         assign_to_prev_day = midnight and scan_2hour == 0 and scan_break == 0
 
-                        # Apply 2-hour offset: timestamp represents start of period, not end
-                        # scan_2hour is the end of the period, subtract 2 to get the start
-                        store_hour = scan_2hour - 2
+                        # Apply 2-hour offset: timestamp represents END of period (when data becomes available)
+                        # scan_2hour is already the end of the period, use it directly
+                        store_hour = scan_2hour
                         store_day, store_month, store_year = use_day, use_month, use_year
                         day_offset = scan_break
                         if assign_to_prev_day:
                             day_offset = max(day_offset, 1)
 
-                        if store_hour < 0:
-                            # Hour wraps to previous day (22:00)
-                            store_hour = 22
-                            if not assign_to_prev_day:
-                                day_offset += 1
+                        if store_hour > 23:
+                            # Hour wraps to next day (00:00 or 02:00)
+                            store_hour = store_hour - 24
+                            day_offset += 1
 
-                        # Shift the attribute date back by the accumulated offset so hours stay with the correct day
+                        # Shift the attribute date by the accumulated offset to align with the correct day
                         for _ in range(day_offset):
                             store_day, store_month, store_year, _ = self._get_prev_day(day=store_day, month=store_month, year=store_year, scan_break=0)
 

@@ -1,7 +1,8 @@
 """Suppoort for Ariston sensors."""
 import logging
-from datetime import timedelta
+from datetime import timedelta, datetime
 from copy import deepcopy
+import calendar
 
 from homeassistant.const import CONF_NAME
 from homeassistant.helpers.entity import Entity
@@ -9,6 +10,7 @@ from homeassistant.helpers.entity import Entity
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorStateClass,
+    SensorEntity,
 )
 
 from .const import param_zoned
@@ -139,7 +141,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     )
 
 
-class AristonSensor(Entity):
+class AristonSensor(SensorEntity):
     """A sensor implementation for Ariston."""
 
     def __init__(self, name, device, sensor_type):
@@ -154,6 +156,7 @@ class AristonSensor(Entity):
         self._icon = SENSORS[sensor_type][2]
         self._device_class = SENSORS[sensor_type][1]
         self._state_class = SENSORS[sensor_type][3]
+        self._attr_last_updated = None
 
     @property
     def unique_id(self):
@@ -243,6 +246,7 @@ class AristonSensor(Entity):
         try:
             if self._sensor_type == PARAM_VERSION:
                 self._state = self._api.version
+                self._attr_last_updated = None
                 return
             if not self._api.available:
                 return
@@ -260,6 +264,38 @@ class AristonSensor(Entity):
                     self._attrs[STEP] = self._api.sensor_values[self._sensor_type][STEP]
             if self._state_class:
                 self._attrs["state_class"] = self._state_class
+
+            # For energy sensors, extract period-end time from attribute keys
+            # Attribute keys follow format: "YYYY_MMM_DD_HH" (e.g., "2024_Dec_25_16")
+            if self._sensor_type in [PARAM_CH_ENERGY2_TODAY, PARAM_DHW_ENERGY2_TODAY] and self._attrs:
+                # Get first (most recent) attribute key to extract timestamp
+                attr_keys = [k for k in self._attrs.keys(
+                ) if '_' in k and k[0].isdigit()]
+                if attr_keys:
+                    # Parse the first key to get period-end time
+                    parts = attr_keys[0].split('_')
+                    if len(parts) >= 4:
+                        try:
+                            year = int(parts[0])
+                            month = list(calendar.month_abbr).index(parts[1])
+                            day = int(parts[2])
+                            hour = int(parts[3])
+
+                            # Set timestamp to 1 second before the period end
+                            # (e.g., 15:59:59 for 14:00-16:00 period, 23:59:59 for 22:00-00:00 period)
+                            # This keeps the value within the correct day's statistics
+                            period_end = datetime(year, month, day, hour, 0, 0)
+                            self._attr_last_updated = period_end - \
+                                timedelta(seconds=1)
+                        except (ValueError, IndexError):
+                            self._attr_last_updated = None
+                    else:
+                        self._attr_last_updated = None
+                else:
+                    self._attr_last_updated = None
+            else:
+                # For non-energy sensors, use current time (default behavior)
+                self._attr_last_updated = None
 
         except KeyError:
             _LOGGER.warning("Problem updating sensors for Ariston")
