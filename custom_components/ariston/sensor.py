@@ -42,6 +42,10 @@ from .const import (
     PARAM_CH_FIXED_TEMP,
     PARAM_CH_ENERGY2_TODAY,
     PARAM_DHW_ENERGY2_TODAY,
+    PARAM_HP_CH_PRODUCED_TODAY,
+    PARAM_HP_DHW_PRODUCED_TODAY,
+    PARAM_HP_CH_CONSUMED_TODAY,
+    PARAM_HP_DHW_CONSUMED_TODAY,
     PARAM_VERSION,
     VALUE,
     UNITS,
@@ -81,6 +85,10 @@ SENSOR_THERMAL_CLEANSE_CYCLE = "Thermal Cleanse Cycle"
 SENSOR_ELECTRICITY_COST = "Electricity Cost"
 SENSOR_CH_ENERGY2_TODAY = 'CH energy 2 today'
 SENSOR_DHW_ENERGY2_TODAY = 'DHW energy 2 today'
+SENSOR_HP_CH_PRODUCED_TODAY = 'HP CH produced energy today'
+SENSOR_HP_DHW_PRODUCED_TODAY = 'HP DHW produced energy today'
+SENSOR_HP_CH_CONSUMED_TODAY = 'HP CH consumed energy today'
+SENSOR_HP_DHW_CONSUMED_TODAY = 'HP DHW consumed energy today'
 SENSOR_VERSION = 'Integration local version'
 
 _LOGGER = logging.getLogger(__name__)
@@ -110,6 +118,10 @@ sensors_default = {
     PARAM_THERMAL_CLEANSE_CYCLE: [SENSOR_THERMAL_CLEANSE_CYCLE, None, "mdi:update", None],
     PARAM_CH_ENERGY2_TODAY: [SENSOR_CH_ENERGY2_TODAY, SensorDeviceClass.ENERGY, "mdi:cash", SensorStateClass.TOTAL_INCREASING],
     PARAM_DHW_ENERGY2_TODAY: [SENSOR_DHW_ENERGY2_TODAY, SensorDeviceClass.ENERGY, "mdi:cash", SensorStateClass.TOTAL_INCREASING],
+    PARAM_HP_CH_PRODUCED_TODAY: [SENSOR_HP_CH_PRODUCED_TODAY, SensorDeviceClass.ENERGY, "mdi:flash", SensorStateClass.TOTAL_INCREASING],
+    PARAM_HP_DHW_PRODUCED_TODAY: [SENSOR_HP_DHW_PRODUCED_TODAY, SensorDeviceClass.ENERGY, "mdi:flash", SensorStateClass.TOTAL_INCREASING],
+    PARAM_HP_CH_CONSUMED_TODAY: [SENSOR_HP_CH_CONSUMED_TODAY, SensorDeviceClass.ENERGY, "mdi:flash", SensorStateClass.TOTAL_INCREASING],
+    PARAM_HP_DHW_CONSUMED_TODAY: [SENSOR_HP_DHW_CONSUMED_TODAY, SensorDeviceClass.ENERGY, "mdi:flash", SensorStateClass.TOTAL_INCREASING],
     PARAM_VERSION: [SENSOR_VERSION, None, "mdi:package-down", None],
 }
 SENSORS = deepcopy(sensors_default)

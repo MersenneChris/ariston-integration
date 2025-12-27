@@ -99,8 +99,10 @@ class AristonHandler:
     _PARAM_DHW_LAST_MONTH_ELECTRICITY = 'dhw_electricity_last_month'
     _PARAM_CH_ENERGY2_TODAY = 'ch_energy2_today'
     _PARAM_DHW_ENERGY2_TODAY = 'dhw_energy2_today'
-    _PARAM_HP_CH_ENERGY_TODAY = 'hp_ch_energy_today'
-    _PARAM_HP_DHW_ENERGY_TODAY = 'hp_dhw_energy_today'
+    _PARAM_HP_CH_PRODUCED_TODAY = 'hp_ch_produced_today'
+    _PARAM_HP_DHW_PRODUCED_TODAY = 'hp_dhw_produced_today'
+    _PARAM_HP_CH_CONSUMED_TODAY = 'hp_ch_consumed_today'
+    _PARAM_HP_DHW_CONSUMED_TODAY = 'hp_dhw_consumed_today'
     _PARAM_HEATING_FLOW_TEMP = "ch_heating_flow_temp"
     _PARAM_HEATING_FLOW_OFFSET = "ch_heating_flow_offset"
 
@@ -249,8 +251,10 @@ class AristonHandler:
     ]
     # Heat pump produced energy data - today's produced energy
     _LIST_HP_ENERGY = [
-        _PARAM_HP_CH_ENERGY_TODAY,
-        _PARAM_HP_DHW_ENERGY_TODAY,
+        _PARAM_HP_CH_PRODUCED_TODAY,
+        _PARAM_HP_DHW_PRODUCED_TODAY,
+        _PARAM_HP_CH_CONSUMED_TODAY,
+        _PARAM_HP_DHW_CONSUMED_TODAY,
     ]
 
     # reverse mapping of Android api to sensor names
@@ -519,11 +523,15 @@ class AristonHandler:
         # It affects frequency of the requests
         self._requests_lists = copy.deepcopy(self._REQUESTS_SEQUENCE)
 
-        # If no sensors specified then no need to send the requests thus increasing frequency of fetching data for wanted sensors
+        # If sensors are specified, prune requests that have no selected sensors
+        self._LOGGER.debug(f"Configured sensors: {sensors}")
         for request, sensor_list in self._MAP_REQUEST.items():
             if request != self._REQUEST_MAIN:
                 # Main requests cannot be removed
-                if not any(item in sensors for item in sensor_list):
+                has_any = any(item in sensors for item in sensor_list)
+                if not has_any:
+                    self._LOGGER.debug(
+                        f"Removing request '{request}' — no matching sensors in {sensor_list}")
                     if request in self._requests_lists[0]:
                         self._requests_lists[0].remove(request)
                     if request in self._requests_lists[1]:
@@ -538,6 +546,8 @@ class AristonHandler:
             # no requests in low prio
             self._last_request_low_prio = None
 
+        self._LOGGER.debug(
+            f"Requests configured. High-priority: {self._requests_lists[0]} | Low-priority: {self._requests_lists[1]}")
         self._subscribed = list()
         self._subscribed_args = list()
         self._subscribed_kwargs = list()
@@ -1103,13 +1113,15 @@ class AristonHandler:
                                 'x', '')] = data_point.get('y', 0)
                         break
 
-                self._ariston_sensors[self._PARAM_HP_CH_ENERGY_TODAY][self._VALUE] = hp_ch_energy
-                self._ariston_sensors[self._PARAM_HP_CH_ENERGY_TODAY][self._ATTRIBUTES] = hp_ch_attrs
-                self._ariston_sensors[self._PARAM_HP_CH_ENERGY_TODAY][self._UNITS] = self._UNIT_KWH
+                self._ariston_sensors[self._PARAM_HP_CH_PRODUCED_TODAY][self._VALUE] = hp_ch_energy
+                self._ariston_sensors[self._PARAM_HP_CH_PRODUCED_TODAY][self._ATTRIBUTES] = hp_ch_attrs
+                self._ariston_sensors[self._PARAM_HP_CH_PRODUCED_TODAY][self._UNITS] = self._UNIT_KWH
+                self._LOGGER.debug(
+                    f"HP ProducedEnergy Heating today: total={hp_ch_energy} kWh; slots={len(hp_ch_attrs)}")
             except Exception as ex:
                 self._LOGGER.warn(
                     f'Issue handling heat pump produced energy for CH, {ex}')
-                self._reset_sensor(self._PARAM_HP_CH_ENERGY_TODAY)
+                self._reset_sensor(self._PARAM_HP_CH_PRODUCED_TODAY)
 
             try:
                 # Find CurrentDay ProducedEnergy for DHW
@@ -1125,13 +1137,63 @@ class AristonHandler:
                                 'x', '')] = data_point.get('y', 0)
                         break
 
-                self._ariston_sensors[self._PARAM_HP_DHW_ENERGY_TODAY][self._VALUE] = hp_dhw_energy
-                self._ariston_sensors[self._PARAM_HP_DHW_ENERGY_TODAY][self._ATTRIBUTES] = hp_dhw_attrs
-                self._ariston_sensors[self._PARAM_HP_DHW_ENERGY_TODAY][self._UNITS] = self._UNIT_KWH
+                self._ariston_sensors[self._PARAM_HP_DHW_PRODUCED_TODAY][self._VALUE] = hp_dhw_energy
+                self._ariston_sensors[self._PARAM_HP_DHW_PRODUCED_TODAY][self._ATTRIBUTES] = hp_dhw_attrs
+                self._ariston_sensors[self._PARAM_HP_DHW_PRODUCED_TODAY][self._UNITS] = self._UNIT_KWH
+                self._LOGGER.debug(
+                    f"HP ProducedEnergy DHW today: total={hp_dhw_energy} kWh; slots={len(hp_dhw_attrs)}")
             except Exception as ex:
                 self._LOGGER.warn(
                     f'Issue handling heat pump produced energy for DHW, {ex}')
-                self._reset_sensor(self._PARAM_HP_DHW_ENERGY_TODAY)
+                self._reset_sensor(self._PARAM_HP_DHW_PRODUCED_TODAY)
+
+            try:
+                # Find CurrentDay ConsumedElectricity for Heating
+                hp_ch_cons = 0
+                hp_ch_cons_attrs = {}
+                for item in histogram_data:
+                    if (item.get('tab') == 'ConsumedElectricity' and
+                        item.get('period') == 'CurrentDay' and
+                            item.get('series') == 'Heating'):
+                        for data_point in item.get('items', []):
+                            hp_ch_cons += data_point.get('y', 0)
+                            hp_ch_cons_attrs[data_point.get(
+                                'x', '')] = data_point.get('y', 0)
+                        break
+
+                self._ariston_sensors[self._PARAM_HP_CH_CONSUMED_TODAY][self._VALUE] = hp_ch_cons
+                self._ariston_sensors[self._PARAM_HP_CH_CONSUMED_TODAY][self._ATTRIBUTES] = hp_ch_cons_attrs
+                self._ariston_sensors[self._PARAM_HP_CH_CONSUMED_TODAY][self._UNITS] = self._UNIT_KWH
+                self._LOGGER.debug(
+                    f"HP ConsumedElectricity Heating today: total={hp_ch_cons} kWh; slots={len(hp_ch_cons_attrs)}")
+            except Exception as ex:
+                self._LOGGER.warn(
+                    f'Issue handling heat pump consumed electricity for CH, {ex}')
+                self._reset_sensor(self._PARAM_HP_CH_CONSUMED_TODAY)
+
+            try:
+                # Find CurrentDay ConsumedElectricity for DHW
+                hp_dhw_cons = 0
+                hp_dhw_cons_attrs = {}
+                for item in histogram_data:
+                    if (item.get('tab') == 'ConsumedElectricity' and
+                        item.get('period') == 'CurrentDay' and
+                            item.get('series') == 'Dhw'):
+                        for data_point in item.get('items', []):
+                            hp_dhw_cons += data_point.get('y', 0)
+                            hp_dhw_cons_attrs[data_point.get(
+                                'x', '')] = data_point.get('y', 0)
+                        break
+
+                self._ariston_sensors[self._PARAM_HP_DHW_CONSUMED_TODAY][self._VALUE] = hp_dhw_cons
+                self._ariston_sensors[self._PARAM_HP_DHW_CONSUMED_TODAY][self._ATTRIBUTES] = hp_dhw_cons_attrs
+                self._ariston_sensors[self._PARAM_HP_DHW_CONSUMED_TODAY][self._UNITS] = self._UNIT_KWH
+                self._LOGGER.debug(
+                    f"HP ConsumedElectricity DHW today: total={hp_dhw_cons} kWh; slots={len(hp_dhw_cons_attrs)}")
+            except Exception as ex:
+                self._LOGGER.warn(
+                    f'Issue handling heat pump consumed electricity for DHW, {ex}')
+                self._reset_sensor(self._PARAM_HP_DHW_CONSUMED_TODAY)
 
         self._subscribers_sensors_inform()
 
@@ -1275,8 +1337,12 @@ class AristonHandler:
 
             elif request_type == self._REQUEST_HP_ENERGY:
                 with self._data_lock:
+                    self._LOGGER.debug(
+                        f"Fetching heat pump energy data for plant '{self._plant_id}' (features: {len(self._features)})")
                     resp = self._api_client.get_heat_pump_energy_data(
                         self._plant_id, self._features)
+                    self._LOGGER.debug(
+                        f"Fetched heat pump energy response status: {getattr(resp, 'status_code', 'unknown')}")
                     self._store_data(resp, request_type)
 
         else:
