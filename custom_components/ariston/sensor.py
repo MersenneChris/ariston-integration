@@ -46,6 +46,11 @@ from .const import (
     PARAM_HP_DHW_PRODUCED_TODAY,
     PARAM_HP_CH_CONSUMED_TODAY,
     PARAM_HP_DHW_CONSUMED_TODAY,
+    PARAM_HP_CH_COP,
+    PARAM_HP_DHW_COP,
+    PARAM_HP_TOTAL_PRODUCED_TODAY,
+    PARAM_HP_TOTAL_CONSUMED_TODAY,
+    PARAM_HP_TOTAL_COP,
     PARAM_VERSION,
     VALUE,
     UNITS,
@@ -89,6 +94,11 @@ SENSOR_HP_CH_PRODUCED_TODAY = 'HP CH produced energy today'
 SENSOR_HP_DHW_PRODUCED_TODAY = 'HP DHW produced energy today'
 SENSOR_HP_CH_CONSUMED_TODAY = 'HP CH consumed energy today'
 SENSOR_HP_DHW_CONSUMED_TODAY = 'HP DHW consumed energy today'
+SENSOR_HP_CH_COP = 'HP CH COP'
+SENSOR_HP_DHW_COP = 'HP DHW COP'
+SENSOR_HP_TOTAL_PRODUCED_TODAY = 'HP total produced energy today'
+SENSOR_HP_TOTAL_CONSUMED_TODAY = 'HP total consumed energy today'
+SENSOR_HP_TOTAL_COP = 'HP total COP'
 SENSOR_VERSION = 'Integration local version'
 
 _LOGGER = logging.getLogger(__name__)
@@ -122,6 +132,11 @@ sensors_default = {
     PARAM_HP_DHW_PRODUCED_TODAY: [SENSOR_HP_DHW_PRODUCED_TODAY, SensorDeviceClass.ENERGY, "mdi:flash", SensorStateClass.TOTAL_INCREASING],
     PARAM_HP_CH_CONSUMED_TODAY: [SENSOR_HP_CH_CONSUMED_TODAY, SensorDeviceClass.ENERGY, "mdi:flash", SensorStateClass.TOTAL_INCREASING],
     PARAM_HP_DHW_CONSUMED_TODAY: [SENSOR_HP_DHW_CONSUMED_TODAY, SensorDeviceClass.ENERGY, "mdi:flash", SensorStateClass.TOTAL_INCREASING],
+    PARAM_HP_CH_COP: [SENSOR_HP_CH_COP, SensorDeviceClass.POWER_FACTOR, "mdi:gauge", SensorStateClass.MEASUREMENT],
+    PARAM_HP_DHW_COP: [SENSOR_HP_DHW_COP, SensorDeviceClass.POWER_FACTOR, "mdi:gauge", SensorStateClass.MEASUREMENT],
+    PARAM_HP_TOTAL_PRODUCED_TODAY: [SENSOR_HP_TOTAL_PRODUCED_TODAY, SensorDeviceClass.ENERGY, "mdi:flash", SensorStateClass.TOTAL_INCREASING],
+    PARAM_HP_TOTAL_CONSUMED_TODAY: [SENSOR_HP_TOTAL_CONSUMED_TODAY, SensorDeviceClass.ENERGY, "mdi:flash", SensorStateClass.TOTAL_INCREASING],
+    PARAM_HP_TOTAL_COP: [SENSOR_HP_TOTAL_COP, SensorDeviceClass.POWER_FACTOR, "mdi:gauge", SensorStateClass.MEASUREMENT],
     PARAM_VERSION: [SENSOR_VERSION, None, "mdi:package-down", None],
 }
 SENSORS = deepcopy(sensors_default)

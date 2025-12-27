@@ -103,6 +103,11 @@ class AristonHandler:
     _PARAM_HP_DHW_PRODUCED_TODAY = 'hp_dhw_produced_today'
     _PARAM_HP_CH_CONSUMED_TODAY = 'hp_ch_consumed_today'
     _PARAM_HP_DHW_CONSUMED_TODAY = 'hp_dhw_consumed_today'
+    _PARAM_HP_CH_COP = 'hp_ch_cop'
+    _PARAM_HP_DHW_COP = 'hp_dhw_cop'
+    _PARAM_HP_TOTAL_PRODUCED_TODAY = 'hp_total_produced_today'
+    _PARAM_HP_TOTAL_CONSUMED_TODAY = 'hp_total_consumed_today'
+    _PARAM_HP_TOTAL_COP = 'hp_total_cop'
     _PARAM_HEATING_FLOW_TEMP = "ch_heating_flow_temp"
     _PARAM_HEATING_FLOW_OFFSET = "ch_heating_flow_offset"
 
@@ -255,6 +260,11 @@ class AristonHandler:
         _PARAM_HP_DHW_PRODUCED_TODAY,
         _PARAM_HP_CH_CONSUMED_TODAY,
         _PARAM_HP_DHW_CONSUMED_TODAY,
+        _PARAM_HP_CH_COP,
+        _PARAM_HP_DHW_COP,
+        _PARAM_HP_TOTAL_PRODUCED_TODAY,
+        _PARAM_HP_TOTAL_CONSUMED_TODAY,
+        _PARAM_HP_TOTAL_COP,
     ]
 
     # reverse mapping of Android api to sensor names
@@ -1194,6 +1204,78 @@ class AristonHandler:
                 self._LOGGER.warn(
                     f'Issue handling heat pump consumed electricity for DHW, {ex}')
                 self._reset_sensor(self._PARAM_HP_DHW_CONSUMED_TODAY)
+
+            # Compute COP sensors (Coefficient of Performance = Produced / Consumed)
+            try:
+                ch_produced = self._ariston_sensors[self._PARAM_HP_CH_PRODUCED_TODAY][self._VALUE]
+                ch_consumed = self._ariston_sensors[self._PARAM_HP_CH_CONSUMED_TODAY][self._VALUE]
+                if ch_consumed and ch_consumed > 0 and ch_produced is not None:
+                    ch_cop = round(ch_produced / ch_consumed, 2)
+                    self._ariston_sensors[self._PARAM_HP_CH_COP][self._VALUE] = ch_cop
+                    self._LOGGER.debug(f"HP CH COP: {ch_cop}")
+                else:
+                    self._reset_sensor(self._PARAM_HP_CH_COP)
+            except Exception as ex:
+                self._LOGGER.warn(f'Issue computing HP CH COP, {ex}')
+                self._reset_sensor(self._PARAM_HP_CH_COP)
+
+            try:
+                dhw_produced = self._ariston_sensors[self._PARAM_HP_DHW_PRODUCED_TODAY][self._VALUE]
+                dhw_consumed = self._ariston_sensors[self._PARAM_HP_DHW_CONSUMED_TODAY][self._VALUE]
+                if dhw_consumed and dhw_consumed > 0 and dhw_produced is not None:
+                    dhw_cop = round(dhw_produced / dhw_consumed, 2)
+                    self._ariston_sensors[self._PARAM_HP_DHW_COP][self._VALUE] = dhw_cop
+                    self._LOGGER.debug(f"HP DHW COP: {dhw_cop}")
+                else:
+                    self._reset_sensor(self._PARAM_HP_DHW_COP)
+            except Exception as ex:
+                self._LOGGER.warn(f'Issue computing HP DHW COP, {ex}')
+                self._reset_sensor(self._PARAM_HP_DHW_COP)
+
+            # Compute total produced and consumed
+            try:
+                ch_produced = self._ariston_sensors[self._PARAM_HP_CH_PRODUCED_TODAY][self._VALUE]
+                dhw_produced = self._ariston_sensors[self._PARAM_HP_DHW_PRODUCED_TODAY][self._VALUE]
+                if ch_produced is not None and dhw_produced is not None:
+                    total_produced = ch_produced + dhw_produced
+                    self._ariston_sensors[self._PARAM_HP_TOTAL_PRODUCED_TODAY][self._VALUE] = total_produced
+                    self._ariston_sensors[self._PARAM_HP_TOTAL_PRODUCED_TODAY][self._UNITS] = self._UNIT_KWH
+                    self._LOGGER.debug(
+                        f"HP Total Produced: {total_produced} kWh")
+                else:
+                    self._reset_sensor(self._PARAM_HP_TOTAL_PRODUCED_TODAY)
+            except Exception as ex:
+                self._LOGGER.warn(f'Issue computing HP total produced, {ex}')
+                self._reset_sensor(self._PARAM_HP_TOTAL_PRODUCED_TODAY)
+
+            try:
+                ch_consumed = self._ariston_sensors[self._PARAM_HP_CH_CONSUMED_TODAY][self._VALUE]
+                dhw_consumed = self._ariston_sensors[self._PARAM_HP_DHW_CONSUMED_TODAY][self._VALUE]
+                if ch_consumed is not None and dhw_consumed is not None:
+                    total_consumed = ch_consumed + dhw_consumed
+                    self._ariston_sensors[self._PARAM_HP_TOTAL_CONSUMED_TODAY][self._VALUE] = total_consumed
+                    self._ariston_sensors[self._PARAM_HP_TOTAL_CONSUMED_TODAY][self._UNITS] = self._UNIT_KWH
+                    self._LOGGER.debug(
+                        f"HP Total Consumed: {total_consumed} kWh")
+                else:
+                    self._reset_sensor(self._PARAM_HP_TOTAL_CONSUMED_TODAY)
+            except Exception as ex:
+                self._LOGGER.warn(f'Issue computing HP total consumed, {ex}')
+                self._reset_sensor(self._PARAM_HP_TOTAL_CONSUMED_TODAY)
+
+            # Compute overall COP
+            try:
+                total_produced = self._ariston_sensors[self._PARAM_HP_TOTAL_PRODUCED_TODAY][self._VALUE]
+                total_consumed = self._ariston_sensors[self._PARAM_HP_TOTAL_CONSUMED_TODAY][self._VALUE]
+                if total_consumed and total_consumed > 0 and total_produced is not None:
+                    total_cop = round(total_produced / total_consumed, 2)
+                    self._ariston_sensors[self._PARAM_HP_TOTAL_COP][self._VALUE] = total_cop
+                    self._LOGGER.debug(f"HP Total COP: {total_cop}")
+                else:
+                    self._reset_sensor(self._PARAM_HP_TOTAL_COP)
+            except Exception as ex:
+                self._LOGGER.warn(f'Issue computing HP total COP, {ex}')
+                self._reset_sensor(self._PARAM_HP_TOTAL_COP)
 
         self._subscribers_sensors_inform()
 
