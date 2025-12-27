@@ -1132,11 +1132,6 @@ class AristonHandler:
         return (energy_today, energy_today_attr, found_key)
 
 
-    def _get_prev_month(self, month, year, scan_break):
-        if month > 1:
-            return month - 1, year, scan_break
-        else:
-            return 12, year - 1, scan_break + 1
 
 
     def _get_prev_day(self, day, month, year, scan_break):
@@ -1149,11 +1144,6 @@ class AristonHandler:
                 return calendar.monthrange(year=year, month=12)[1], 12, year - 1, scan_break + 1
 
 
-    def _get_prev_day_week(self, day):
-        if day > 0:
-            return day - 1
-        else:
-            return 6
 
 
     def _get_prev_hour(self, hour, scan_break):
