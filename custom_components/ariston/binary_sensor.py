@@ -5,7 +5,7 @@ from copy import deepcopy
 from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
 )
-from homeassistant.const import CONF_BINARY_SENSORS, CONF_NAME
+from homeassistant.const import CONF_NAME
 
 from .const import param_zoned
 from .const import (
@@ -75,22 +75,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
     
     async_add_entities(
         [AristonBinarySensor(name, device, sensor_type) for sensor_type in binary_sensors],
-        True,
-    )
-
-
-def setup_platform(hass, config, add_entities, discovery_info=None):
-    """Set up a binary sensor for Ariston."""
-    if discovery_info is None:
-        return
-
-    name = discovery_info[CONF_NAME]
-    device = hass.data[DATA_ARISTON][DEVICES][name]
-    add_entities(
-        [
-            AristonBinarySensor(name, device, sensor_type)
-            for sensor_type in discovery_info[CONF_BINARY_SENSORS]
-        ],
         True,
     )
 

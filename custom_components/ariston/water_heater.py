@@ -51,17 +51,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
     async_add_entities([AristonWaterHeater(name, device)], True)
 
 
-def setup_platform(hass, config, add_entities, discovery_info=None):
-    """Set up the Ariston water heater devices."""
-    if discovery_info is None:
-        return
-
-    name = discovery_info[CONF_NAME]
-    device = hass.data[DATA_ARISTON][DEVICES][name]
-
-    add_entities([AristonWaterHeater(name, device)])
-
-
 class AristonWaterHeater(WaterHeaterEntity):
     """Ariston Water Heater Device."""
 

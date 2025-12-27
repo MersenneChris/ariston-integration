@@ -110,9 +110,6 @@ DOMAIN = "ariston"
 DATA_ARISTON = DOMAIN
 DEVICES = "devices"
 SERVICE_SET_DATA = "set_data"
-CLIMATES = "climates"
-WATER_HEATERS = "water_heaters"
-CONF_CLIMATES = "climates"
 
 def param_zoned(param, zone):
     if param in ZONED_PARAMS:

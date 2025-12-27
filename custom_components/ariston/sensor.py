@@ -3,7 +3,7 @@ import logging
 from datetime import timedelta
 from copy import deepcopy
 
-from homeassistant.const import CONF_NAME, CONF_SENSORS
+from homeassistant.const import CONF_NAME
 from homeassistant.helpers.entity import Entity
 
 from homeassistant.components.sensor import (
@@ -135,22 +135,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
     
     async_add_entities(
         [AristonSensor(name, device, sensor_type) for sensor_type in sensors],
-        True,
-    )
-
-
-def setup_platform(hass, config, add_entities, discovery_info=None):
-    """Set up a sensor for Ariston."""
-    if discovery_info is None:
-        return
-
-    name = discovery_info[CONF_NAME]
-    device = hass.data[DATA_ARISTON][DEVICES][name]
-    add_entities(
-        [
-            AristonSensor(name, device, sensor_type)
-            for sensor_type in discovery_info[CONF_SENSORS]
-        ],
         True,
     )
 

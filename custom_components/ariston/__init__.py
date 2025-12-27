@@ -24,8 +24,6 @@ from .const import (
     DATA_ARISTON,
     DEVICES,
     SERVICE_SET_DATA,
-    CLIMATES,
-    WATER_HEATERS,
     CONF_LOG,
     CONF_GW,
     CONF_PERIOD_SET,
@@ -69,13 +67,13 @@ PLATFORMS = [
 
 async def async_setup(hass: HomeAssistant, config: dict):
     """Set up the Ariston component."""
-    hass.data.setdefault(DATA_ARISTON, {DEVICES: {}, CLIMATES: [], WATER_HEATERS: []})
+    hass.data.setdefault(DATA_ARISTON, {DEVICES: {}})
     return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Set up Ariston from a config entry."""
-    hass.data.setdefault(DATA_ARISTON, {DEVICES: {}, CLIMATES: [], WATER_HEATERS: []})
+    hass.data.setdefault(DATA_ARISTON, {DEVICES: {}})
     
     name = entry.data.get(CONF_NAME, DEFAULT_NAME)
     username = entry.data[CONF_USERNAME]

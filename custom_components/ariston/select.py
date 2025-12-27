@@ -4,7 +4,7 @@ from datetime import timedelta
 from copy import deepcopy
 
 from homeassistant.components.select import SelectEntity
-from homeassistant.const import CONF_SELECTOR, CONF_NAME
+from homeassistant.const import CONF_NAME
 
 from .const import param_zoned
 from .const import (
@@ -83,22 +83,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
     
     async_add_entities(
         [AristonSelect(name, device, select_type) for select_type in selects],
-        True,
-    )
-
-
-def setup_platform(hass, config, add_entities, discovery_info=None):
-    """Set up a select for Ariston."""
-    if discovery_info is None:
-        return
-
-    name = discovery_info[CONF_NAME]
-    device = hass.data[DATA_ARISTON][DEVICES][name]
-    add_entities(
-        [
-            AristonSelect(name, device, select_type)
-            for select_type in discovery_info[CONF_SELECTOR]
-        ],
         True,
     )
 

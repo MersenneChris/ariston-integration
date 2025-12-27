@@ -18,7 +18,6 @@ from homeassistant.const import (
 )
 
 from .const import (
-    CONF_CLIMATES,
     DATA_ARISTON,
     DEVICES,
     DOMAIN,
@@ -65,24 +64,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
         climates.append(AristonThermostat(name, device, climate_name))
     _LOGGER.info("Adding %d climate entities for %s", len(climates), name)
     async_add_entities(climates, True)
-
-
-def setup_platform(hass, config, add_entities, discovery_info=None):
-    """Setup the Ariston Platform (legacy - deprecated)."""
-    # This is deprecated - use async_setup_entry instead
-    if discovery_info is None:
-        return
-    _LOGGER.warning("Legacy setup_platform called for climate - should use async_setup_entry instead")
-    name = discovery_info.get(CONF_NAME)
-    if not name or name not in hass.data[DATA_ARISTON][DEVICES]:
-        return
-    device = hass.data[DATA_ARISTON][DEVICES][name]
-    num_ch_zones = discovery_info.get("num_ch_zones", 1)
-    climates = []
-    for zone in range(1, num_ch_zones + 1):
-        climate_name = f"{name} Zone{zone}"
-        climates.append(AristonThermostat(name, device, climate_name))
-    add_entities(climates, True)
 
 class AristonThermostat(ClimateEntity):
     """Representation of a Ariston Thermostat."""
