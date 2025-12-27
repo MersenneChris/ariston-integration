@@ -1083,7 +1083,7 @@ class AristonHandler:
         """
         energy_today = 0
         energy_today_attr = {}
-        hour_text = "{}_{}_{:02}_{:02}"
+        hour_text = "{}_{}_{:02}_{:02}:{:02}"
         found_key = False
 
         for item in self._energy_use_data:
@@ -1093,21 +1093,21 @@ class AristonHandler:
                 if item['p'] == 1:
                     scan_2hour = this_2hour
                     scan_break = 0
-                    midnight = (this_2hour == 2)
 
                     for value in reversed(item['v']):
                         scan_2hour, scan_break = self._get_prev_hour(hour=scan_2hour, scan_break=scan_break)
-
-                        # Determine if this first slot after midnight belongs to previous day (22-00)
-                        assign_to_prev_day = midnight and scan_2hour == 0 and scan_break == 0
+                        # Skip the 22:00–00:00 bin (end time 00:00) which belongs to the previous day
+                        if scan_2hour == 0:
+                            # Mark that we've crossed into previous day for subsequent iterations
+                            scan_break = max(scan_break, 1)
+                            continue
 
                         # Apply 2-hour offset: timestamp represents END of period (when data becomes available)
-                        # scan_2hour is already the end of the period, use it directly
-                        store_hour = scan_2hour
+                        # Store as HH:59 for the end-of-slot time
+                        store_hour = scan_2hour - 1
+                        store_minute = 59
                         store_day, store_month, store_year = this_day, this_month, this_year
                         day_offset = scan_break
-                        if assign_to_prev_day:
-                            day_offset = max(day_offset, 1)
 
                         if store_hour > 23:
                             # Hour wraps to next day (00:00 or 02:00)
@@ -1120,10 +1120,11 @@ class AristonHandler:
 
                         if day_offset > 0:
                             # Data belongs to yesterday, skip (only today's data is used)
-                            pass
-                        else:
-                            energy_today_attr[hour_text.format(store_year, calendar.month_abbr[store_month], store_day, store_hour)] = value
-                            energy_today += value
+                            continue
+
+                        energy_today_attr[hour_text.format(
+                            store_year, calendar.month_abbr[store_month], store_day, store_hour, store_minute)] = value
+                        energy_today += value
 
         if not found_key:
             energy_today = None
