@@ -154,6 +154,16 @@ class AristonApiClient:
         )
         return resp
 
+    def get_heat_pump_energy_data(self, plant_id, features):
+        """Fetch heat pump energy production data."""
+        resp = self.request_post(
+            url=f'{self._ARISTON_URL}/R2/PlantMetering/GetData/{plant_id}',
+            json_data={"features": features, "hasCooling": False},
+            timeout=self._TIMEOUT_AV,
+            error_msg="Heat pump energy data read"
+        )
+        return resp
+
     # --- Set operations ---
     def set_plant_mode(self, plant_id, new_value, old_value):
         return self.request_post(
