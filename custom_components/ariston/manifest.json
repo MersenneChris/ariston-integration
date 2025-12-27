@@ -11,5 +11,5 @@
   "loggers": ["ariston_nimbus"],
   "requirements": [],
   "supports_reconfigure": true,
-  "version": "1.0.31"
+  "version": "1.0.32"
 }

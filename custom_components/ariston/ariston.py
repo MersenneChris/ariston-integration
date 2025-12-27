@@ -6,7 +6,8 @@ import logging
 import re
 import threading
 from typing import Union
-import requests
+
+from .api_client import AristonApiClient
 
 
 class AristonHandler:
@@ -31,7 +32,6 @@ class AristonHandler:
 
     _VERSION = "2.0.16"
 
-    _ARISTON_URL = "https://www.ariston-net.remotethermo.com"
 
     # API configuration
     _MAX_RETRIES = 5
@@ -39,9 +39,6 @@ class AristonHandler:
     _SET_SENSORS_PERIOD_SECONDS = 30
     _MAX_ERRORS = 5
     _WAIT_PERIOD_MULTIPLYER = 5
-    _TIMEOUT_MIN = 5
-    _TIMEOUT_AV = 15
-    _TIMEOUT_MAX = 25
     _TIME_SPLIT = 0.1
 
     # Log levels
@@ -489,7 +486,7 @@ class AristonHandler:
         self._data_lock = threading.Lock()
         self._lock = threading.Lock()
         self._plant_id_lock = threading.Lock()
-        self._session = requests.Session()
+        self._api_client = AristonApiClient(self._LOGGER)
         self._login = False
         self._plant_id = ""
         self._started = False
@@ -768,78 +765,16 @@ class AristonHandler:
         return sensors_dictionary
 
 
-    def _request_post(self, url, json_data, timeout=_TIMEOUT_MIN, error_msg=''):
-        """ post request """
-        try:
-            resp = self._session.post(
-                url,
-                timeout=timeout,
-                json=json_data,
-                verify=True)
-        except requests.exceptions.RequestException as ex:
-            self._LOGGER.warning(f'{error_msg} exception: {ex}')
-            raise Exception(f'{error_msg} exception: {ex}')
-        if not resp.ok:
-            self._LOGGER.warning(f'{error_msg} reply code: {resp.status_code}')
-            self._LOGGER.warning(f'{resp.text}')
-            raise Exception(f'{error_msg} reply code: {resp.status_code}')
-        return resp
-
-
-    def _request_get(self, url, timeout=_TIMEOUT_MIN, error_msg='', ignore_errors=False):
-        try:
-            resp = self._session.get(
-                url,
-                timeout=timeout,
-                verify=True)
-        except requests.exceptions.RequestException as ex:
-            self._LOGGER.warning(f'{error_msg} exception: {ex}')
-            if not ignore_errors:
-                raise Exception(f'{error_msg} exception: {ex}')
-        if not resp.ok:
-            log_text = True
-            if resp.status_code == 500:
-                # Unsupported additional parameters are visible in the HTML reply, remove them if available
-                for re_string in re.findall('Violated Postcondition.*menu', resp.text):
-                    for sensor, menu_item in self._MAP_ARISTON_WEB_MENU_PARAMS.items():
-                        html_item = menu_item.replace('U','').replace('_','.')
-                        check_menu = f"&quot;{html_item}&quot;"
-                        if check_menu in re_string:
-                            self._LOGGER.error(f'Unsupported sensor {sensor} detected with menu item {menu_item}')
-                            self._other_parameters.remove(menu_item)
-                            if not self._other_parameters:
-                                self._requests_lists[0].remove(self._REQUEST_ADDITIONAL)
-                            log_text = False
-            self._LOGGER.warning(f'{error_msg} reply code: {resp.status_code}')
-            if log_text:
-                self._LOGGER.warning(f'{resp.text}')
-            if not ignore_errors:
-                raise Exception(f'{error_msg} reply code: {resp.status_code}')
-        return resp
 
 
     def _login_session(self):
         """Login to fetch Ariston Plant ID and confirm login"""
         if not self._login and self._started:
             # First login
-            login_data = {
-                "email": self._user,
-                "password": self._password,
-                "rememberMe": False,
-                "language": "English_Us"
-                }
-            self._request_post(
-                url=f'{self._ARISTON_URL}/R2/Account/Login',
-                json_data=login_data,
-                error_msg='Login'
-            )
+            self._api_client.login(self._user, self._password)
 
             # Fetch plant IDs
-            resp = self._request_get(
-                url=f'{self._ARISTON_URL}/api/v2/remote/plants/lite',
-                error_msg='Gateways'
-            )
-            gateways = [item['gwId'] for item in resp.json()]
+            gateways = self._api_client.get_gateways()
             if self._default_gw:
                 if self._default_gw not in gateways:
                     self._LOGGER.error(f'Specified gateway {self._default_gw} not found in {gateways}')
@@ -852,11 +787,8 @@ class AristonHandler:
                     raise Exception(f'At least one gateway is expected to be found')
                 # Use first plant plant id
                 plant_id = gateways[0]
-            resp = self._request_get(
-                url=f'{self._ARISTON_URL}/api/v2/remote/plants/{plant_id}/features?eagerMode=True',
-                error_msg='Features'
-            )
-            features = resp.json()
+
+            features = self._api_client.get_plant_features(plant_id)
             if plant_id:
                 with self._plant_id_lock:
                     self._features = copy.deepcopy(features)
@@ -1092,7 +1024,6 @@ class AristonHandler:
             this_month = datetime.date.today().month
             this_year = datetime.date.today().year
             this_day = datetime.date.today().day
-            this_day_week = datetime.date.today().weekday()
             this_hour = datetime.datetime.now().hour
             CH_ENERGY2 = 1
             DHW_ENERGY2 = 2
@@ -1106,26 +1037,13 @@ class AristonHandler:
             try:
                 (
                     self._ariston_sensors[self._PARAM_CH_ENERGY2_TODAY][self._VALUE],
-                    _,  # yesterday
-                    _,  # last_7_days
-                    _,  # this_month
-                    _,  # last_month
-                    _,  # this_year
-                    _,  # last_year
                     self._ariston_sensors[self._PARAM_CH_ENERGY2_TODAY][self._ATTRIBUTES],
-                    _,  # yesterday_attr
-                    _,  # last_7_days_attr
-                    _,  # this_month_attr
-                    _,  # last_month_attr
-                    _,  # this_year_attr
-                    _,  # last_year_attr
                     found_key,
                 ) = self._get_energy_data(
                     CH_ENERGY2,
                     this_year=this_year,
                     this_month=this_month,
                     this_day=this_day,
-                    this_day_week=this_day_week,
                     this_2hour=this_2hour)
                 if found_key:
                     self._ariston_sensors[self._PARAM_CH_ENERGY2_TODAY][self._UNITS] = self._UNIT_KWH
@@ -1135,26 +1053,13 @@ class AristonHandler:
             try:
                 (
                     self._ariston_sensors[self._PARAM_DHW_ENERGY2_TODAY][self._VALUE],
-                    _,  # yesterday
-                    _,  # last_7_days
-                    _,  # this_month
-                    _,  # last_month
-                    _,  # this_year
-                    _,  # last_year
                     self._ariston_sensors[self._PARAM_DHW_ENERGY2_TODAY][self._ATTRIBUTES],
-                    _,  # yesterday_attr
-                    _,  # last_7_days_attr
-                    _,  # this_month_attr
-                    _,  # last_month_attr
-                    _,  # this_year_attr
-                    _,  # last_year_attr
                     found_key,
                 ) = self._get_energy_data(
                     DHW_ENERGY2,
                     this_year=this_year,
                     this_month=this_month,
                     this_day=this_day,
-                    this_day_week=this_day_week,
                     this_2hour=this_2hour)
                 if found_key:
                     self._ariston_sensors[self._PARAM_DHW_ENERGY2_TODAY][self._UNITS] = self._UNIT_KWH
@@ -1164,44 +1069,32 @@ class AristonHandler:
 
         self._subscribers_sensors_inform()
 
-
-    def _get_energy_data(self, k_num, this_year, this_month, this_day, this_day_week, this_2hour):
+    def _get_energy_data(self, k_num, this_year, this_month, this_day, this_2hour):
+        """
+        Extract energy data for today from the API response.
+        
+        Args:
+            k_num: Energy type (1 for CH, 2 for DHW)
+            this_year, this_month, this_day: Current date
+            this_2hour: Current 2-hour period
+            
+        Returns:
+            Tuple of (energy_today, energy_today_attr, found_key)
+        """
         energy_today = 0
-        energy_yesterday = 0
-        energy_last_7_days = 0
-        energy_this_month = 0
-        energy_last_month = 0
-        energy_this_year = 0
-        energy_last_year = 0
         energy_today_attr = {}
-        energy_yesterday_attr = {}
-        energy_last_7_days_attr = {}
-        energy_this_month_attr = {}
-        energy_last_month_attr = {}
-        energy_this_year_attr = {}
-        energy_last_year_attr = {}
         hour_text = "{}_{}_{:02}_{:02}"
-        weekday_text = "{}_{}_{:02}_{}"
-        month_text = "{}_{}_{:02}"
-        year_text = "{}_{}"
         found_key = False
+
         for item in self._energy_use_data:
             if item["k"] == k_num:
                 found_key = True
-                scan_month = this_month
-                scan_year = this_year
-                scan_day = this_day
-                scan_day_week = this_day_week
-                scan_2hour = this_2hour
-                scan_break = 0
+                # Only process p==1 (today's 2-hour data)
                 if item['p'] == 1:
-                    prev_day, prev_month, prev_year, _ = self._get_prev_day(day=this_day, month=this_month, year=this_year, scan_break=0)
-                    prev_day_2, prev_month_2, prev_year_2, _ = self._get_prev_day(day=prev_day, month=prev_month, year=prev_year, scan_break=0)
-                    use_day, use_month, use_year = this_day, this_month, this_year
-                    if this_2hour == 2:
-                        midnight = True
-                    else:
-                        midnight = False
+                    scan_2hour = this_2hour
+                    scan_break = 0
+                    midnight = (this_2hour == 2)
+
                     for value in reversed(item['v']):
                         scan_2hour, scan_break = self._get_prev_hour(hour=scan_2hour, scan_break=scan_break)
 
@@ -1211,7 +1104,7 @@ class AristonHandler:
                         # Apply 2-hour offset: timestamp represents END of period (when data becomes available)
                         # scan_2hour is already the end of the period, use it directly
                         store_hour = scan_2hour
-                        store_day, store_month, store_year = use_day, use_month, use_year
+                        store_day, store_month, store_year = this_day, this_month, this_year
                         day_offset = scan_break
                         if assign_to_prev_day:
                             day_offset = max(day_offset, 1)
@@ -1226,64 +1119,17 @@ class AristonHandler:
                             store_day, store_month, store_year, _ = self._get_prev_day(day=store_day, month=store_month, year=store_year, scan_break=0)
 
                         if day_offset > 0:
-                            energy_yesterday_attr[hour_text.format(store_year, calendar.month_abbr[store_month], store_day, store_hour)] = value
-                            energy_yesterday += value
+                            # Data belongs to yesterday, skip (only today's data is used)
+                            pass
                         else:
                             energy_today_attr[hour_text.format(store_year, calendar.month_abbr[store_month], store_day, store_hour)] = value
                             energy_today += value
-                if item['p'] == 2:
-                    for value in reversed(item['v']):
-                        scan_day, scan_month, scan_year, _ = self._get_prev_day(day=scan_day, month=scan_month, year=scan_year, scan_break=0)
-                        scan_day_week = self._get_prev_day_week(day=scan_day_week)
-                        energy_last_7_days_attr[weekday_text.format(scan_year, calendar.month_abbr[scan_month], scan_day, calendar.day_abbr[scan_day_week])] = value
-                        energy_last_7_days += value
-                if item['p'] == 3:
-                    energy_this_month_attr[month_text.format(this_year, calendar.month_abbr[this_month], this_day)] = energy_today
-                    energy_this_month += energy_today
-                    for value in reversed(item['v']):
-                        scan_day, scan_month, scan_year, scan_break = self._get_prev_day(day=scan_day, month=scan_month, year=scan_year, scan_break=scan_break)
-                        if scan_break == 0:
-                            energy_this_month_attr[month_text.format(scan_year, calendar.month_abbr[scan_month], scan_day)] = value
-                            energy_this_month += value
-                        elif scan_break == 1:
-                            energy_last_month_attr[month_text.format(scan_year, calendar.month_abbr[scan_month], scan_day)] = value
-                            energy_last_month += value
-                if item['p'] == 4:
-                    energy_this_year_attr[year_text.format(this_year, calendar.month_abbr[this_month])] = energy_this_month
-                    energy_this_year += energy_this_month
-                    for value in reversed(item['v']):
-                        scan_month, scan_year, scan_break = self._get_prev_month(month=scan_month, year=scan_year, scan_break=scan_break)
-                        if scan_break == 0:
-                            energy_this_year_attr[year_text.format(scan_year, calendar.month_abbr[scan_month])] = value
-                            energy_this_year += value
-                        elif scan_break == 1:
-                            energy_last_year_attr[year_text.format(scan_year, calendar.month_abbr[scan_month])] = value
-                            energy_last_year += value
+
         if not found_key:
             energy_today = None
-            energy_yesterday = None
-            energy_last_7_days = None
-            energy_this_month = None
-            energy_last_month = None
-            energy_this_year = None
-            energy_last_year = None
-        return (
-            energy_today,
-            energy_yesterday,
-            energy_last_7_days,
-            energy_this_month,
-            energy_last_month,
-            energy_this_year,
-            energy_last_year,
-            energy_today_attr,
-            energy_yesterday_attr,
-            energy_last_7_days_attr,
-            energy_this_month_attr,
-            energy_last_month_attr,
-            energy_this_year_attr,
-            energy_last_year_attr,
-            found_key
-        )
+            energy_today_attr = {}
+
+        return (energy_today, energy_today_attr, found_key)
 
 
     def _get_prev_month(self, month, year, scan_break):
@@ -1323,7 +1169,6 @@ class AristonHandler:
         if self._login and self._plant_id != "":
 
             if request_type == self._REQUEST_MAIN:
-
                 request_data = {
                     "useCache": False,
                     "items": [],
@@ -1336,72 +1181,39 @@ class AristonHandler:
                         for param in self._MAP_ARISTON_MULTIZONE_PARAMS.values():
                             request_data['items'].append({"id": param, "zn":zone})
                 with self._data_lock:
-                    resp = self._request_post(
-                        url=f'{self._ARISTON_URL}/api/v2/remote/dataItems/{self._plant_id}/get?umsys=si',
-                        json_data=request_data,
-                        timeout=self._TIMEOUT_MAX,
-                        error_msg="Main read"
-                    )
+                    resp = self._api_client.get_main_data(
+                        self._plant_id, request_data)
                     self._store_data(resp, request_type)
 
             elif request_type == self._REQUEST_ERRORS:
-
                 with self._data_lock:
-                    resp = self._request_get(
-                        url=f'{self._ARISTON_URL}/api/v2/busErrors?gatewayId={self._plant_id}&blockingOnly=False&culture=en-US',
-                        timeout=self._TIMEOUT_AV,
-                        error_msg="Errors read"
-                    )
+                    resp = self._api_client.get_errors(self._plant_id)
                     self._store_data(resp, request_type)
 
             elif request_type == self._REQUEST_CH_SCHEDULE:
-
                 with self._data_lock:
-                    resp = self._request_get(
-                        url=f'{self._ARISTON_URL}/api/v2/remote/timeProgs/{self._plant_id}/ChZn1?umsys=si',
-                        timeout=self._TIMEOUT_AV,
-                        error_msg="CH Schedule read"
-                    )
+                    resp = self._api_client.get_ch_schedule(self._plant_id)
                     self._store_data(resp, request_type)
 
             elif request_type == self._REQUEST_DHW_SCHEDULE:
-
                 with self._data_lock:
-                    resp = self._request_get(
-                        url=f'{self._ARISTON_URL}/api/v2/remote/timeProgs/{self._plant_id}/Dhw?umsys=si',
-                        timeout=self._TIMEOUT_AV,
-                        error_msg="DHW Schedule read"
-                    )
+                    resp = self._api_client.get_dhw_schedule(self._plant_id)
                     self._store_data(resp, request_type)
 
             elif request_type == self._REQUEST_ADDITIONAL:
-
                 with self._data_lock:
-                    resp = self._request_get(
-                        url=f'{self._ARISTON_URL}/R2/PlantMenu/Refresh?id={self._plant_id}&paramIds={",".join(self._other_parameters)}',
-                        timeout=self._TIMEOUT_AV,
-                        error_msg="Additional data read"
-                    )
+                    resp = self._api_client.get_additional_data(
+                        self._plant_id, self._other_parameters)
                     self._store_data(resp, request_type)
 
             elif request_type == self._REQUEST_LAST_MONTH:
-
                 with self._data_lock:
-                    resp = self._request_get(
-                        url=f'{self._ARISTON_URL}/api/v2/remote/reports/{self._plant_id}/energyAccount',
-                        timeout=self._TIMEOUT_AV,
-                        error_msg="Last month data read"
-                    )
+                    resp = self._api_client.get_last_month_data(self._plant_id)
                     self._store_data(resp, request_type)
 
             elif request_type == self._REQUEST_ENERGY:
-
                 with self._data_lock:
-                    resp = self._request_get(
-                        url=f'{self._ARISTON_URL}/api/v2/remote/reports/{self._plant_id}/consSequencesApi8?usages=Ch%2CDhw&hasSlp=False',
-                        timeout=self._TIMEOUT_AV,
-                        error_msg="Energy data read"
-                    )
+                    resp = self._api_client.get_energy_data(self._plant_id)
                     self._store_data(resp, request_type)
 
         else:
@@ -1525,34 +1337,22 @@ class AristonHandler:
                         if original_parameter == self._PARAM_MODE:
 
                             old_value = self._string_option_to_number(parameter, self._get_sensor_value(parameter))
-                            self._request_post(
-                                url=f'{self._ARISTON_URL}/api/v2/remote/plantData/{self._plant_id}/mode',
-                                json_data={"new": set_value,"old": old_value},
-                                error_msg='Set Mode',
-                                timeout=self._TIMEOUT_AV
-                            )
+                            self._api_client.set_plant_mode(
+                                self._plant_id, set_value, old_value)
                             break
 
                         elif original_parameter == self._PARAM_CH_MODE:
 
                             old_value = self._string_option_to_number(parameter, self._get_sensor_value(parameter))
-                            self._request_post(
-                                url=f'{self._ARISTON_URL}/api/v2/remote/zones/{self._plant_id}/{zone}/mode',
-                                json_data={"new": set_value,"old": old_value},
-                                error_msg='Set CH Mode',
-                                timeout=self._TIMEOUT_AV
-                            )
+                            self._api_client.set_zone_mode(
+                                self._plant_id, zone, set_value, old_value)
                             break
 
                         elif original_parameter == self._PARAM_DHW_MODE:
 
                             old_value = self._string_option_to_number(parameter, self._get_sensor_value(parameter))
-                            self._request_post(
-                                url=f'{self._ARISTON_URL}/api/v2/remote/plantData/{self._plant_id}/dhwMode',
-                                json_data={"new": set_value,"old": old_value},
-                                error_msg='Set DHW Mode',
-                                timeout=self._TIMEOUT_AV
-                            )
+                            self._api_client.set_dhw_mode(
+                                self._plant_id, set_value, old_value)
                             break
 
                         elif original_parameter == self._PARAM_CH_SET_TEMPERATURE:
@@ -1566,11 +1366,13 @@ class AristonHandler:
                                 economy_new = set_value
                             else:
                                 comfort_new = set_value
-                            self._request_post(
-                                url=f'{self._ARISTON_URL}/api/v2/remote/zones/{self._plant_id}/{zone}/temperatures?umsys=si',
-                                json_data={"new":{"comf": comfort_new, "econ": economy_new}, "old":{"comf": comfort_old, "econ": economy_old}},
-                                error_msg='Set CH Temperature',
-                                timeout=self._TIMEOUT_AV
+                            self._api_client.set_zone_temperatures(
+                                self._plant_id,
+                                zone,
+                                new_payload={"comf": comfort_new,
+                                             "econ": economy_new},
+                                old_payload={"comf": comfort_old,
+                                             "econ": economy_old},
                             )
                             break
 
@@ -1579,11 +1381,13 @@ class AristonHandler:
                             comfort_old = self._get_sensor_value(self._zone_sensor_name(self._PARAM_CH_COMFORT_TEMPERATURE, zone))
                             economy_old= self._get_sensor_value(self._zone_sensor_name(self._PARAM_CH_ECONOMY_TEMPERATURE, zone)) 
                             economy_new = self._ariston_sensors[self._zone_sensor_name(self._PARAM_CH_ECONOMY_TEMPERATURE, zone)][self._VALUE]
-                            self._request_post(
-                                url=f'{self._ARISTON_URL}/api/v2/remote/zones/{self._plant_id}/{zone}/temperatures?umsys=si',
-                                json_data={"new":{"comf": set_value, "econ": economy_new}, "old":{"comf": comfort_old, "econ": economy_old}},
-                                error_msg='Set CH Temperature',
-                                timeout=self._TIMEOUT_AV
+                            self._api_client.set_zone_temperatures(
+                                self._plant_id,
+                                zone,
+                                new_payload={"comf": set_value,
+                                             "econ": economy_new},
+                                old_payload={"comf": comfort_old,
+                                             "econ": economy_old},
                             )
                             break
 
@@ -1592,23 +1396,21 @@ class AristonHandler:
                             comfort_old = self._get_sensor_value(self._zone_sensor_name(self._PARAM_CH_COMFORT_TEMPERATURE, zone))
                             comfort_new = self._ariston_sensors[self._zone_sensor_name(self._PARAM_CH_COMFORT_TEMPERATURE, zone)][self._VALUE]
                             economy_old= self._get_sensor_value(self._zone_sensor_name(self._PARAM_CH_ECONOMY_TEMPERATURE, zone)) 
-                            self._request_post(
-                                url=f'{self._ARISTON_URL}/api/v2/remote/zones/{self._plant_id}/{zone}/temperatures?umsys=si',
-                                json_data={"new":{"comf": comfort_new, "econ": set_value}, "old":{"comf": comfort_old, "econ": economy_old}},
-                                error_msg='Set CH Temperature',
-                                timeout=self._TIMEOUT_AV
+                            self._api_client.set_zone_temperatures(
+                                self._plant_id,
+                                zone,
+                                new_payload={"comf": comfort_new,
+                                             "econ": set_value},
+                                old_payload={"comf": comfort_old,
+                                             "econ": economy_old},
                             )
                             break
 
                         elif original_parameter == self._PARAM_DHW_SET_TEMPERATURE:
 
                             old_value = self._get_sensor_value(parameter) 
-                            self._request_post(
-                                url=f'{self._ARISTON_URL}/api/v2/remote/plantData/{self._plant_id}/dhwTemp?umsys=si',
-                                json_data={"new": set_value,"old": old_value},
-                                error_msg='Set DHW Temperature',
-                                timeout=self._TIMEOUT_AV
-                            )
+                            self._api_client.set_dhw_temp(
+                                self._plant_id, set_value, old_value)
                             break
 
                         elif original_parameter == self._PARAM_DHW_COMFORT_TEMPERATURE:
@@ -1616,11 +1418,12 @@ class AristonHandler:
                             comfort_old = self._get_sensor_value(self._PARAM_DHW_COMFORT_TEMPERATURE) 
                             economy_old= self._get_sensor_value(self._PARAM_DHW_ECONOMY_TEMPERATURE) 
                             economy_new = self._ariston_sensors[self._PARAM_DHW_ECONOMY_TEMPERATURE][self._VALUE]
-                            self._request_post(
-                                url=f'{self._ARISTON_URL}/api/v2/remote/plantData/{self._plant_id}/dhwTimeProgTemperatures?umsys=si',
-                                json_data={"new":{"comf": set_value, "econ": economy_new}, "old":{"comf": comfort_old, "econ": economy_old}},
-                                error_msg='Set DHW Comfort Temperature',
-                                timeout=self._TIMEOUT_AV
+                            self._api_client.set_dhw_timeprog_temps(
+                                self._plant_id,
+                                new_payload={"comf": set_value,
+                                             "econ": economy_new},
+                                old_payload={"comf": comfort_old,
+                                             "econ": economy_old},
                             )
                             break
 
@@ -1629,11 +1432,12 @@ class AristonHandler:
                             comfort_old = self._get_sensor_value(self._PARAM_DHW_COMFORT_TEMPERATURE)
                             comfort_new = self._ariston_sensors[self._PARAM_DHW_COMFORT_TEMPERATURE][self._VALUE]
                             economy_old= self._get_sensor_value(self._PARAM_DHW_ECONOMY_TEMPERATURE) 
-                            self._request_post(
-                                url=f'{self._ARISTON_URL}/api/v2/remote/plantData/{self._plant_id}/dhwTimeProgTemperatures?umsys=si',
-                                json_data={"new":{"comf": comfort_new, "econ": set_value}, "old":{"comf": comfort_old, "econ": economy_old}},
-                                error_msg='Set DHW Economy Temperature',
-                                timeout=self._TIMEOUT_AV
+                            self._api_client.set_dhw_timeprog_temps(
+                                self._plant_id,
+                                new_payload={"comf": comfort_new,
+                                             "econ": set_value},
+                                old_payload={"comf": comfort_old,
+                                             "econ": economy_old},
                             )
                             break
 
@@ -1665,12 +1469,8 @@ class AristonHandler:
                 else:
                     try:
                         if set_additional_params:
-                            self._request_post(
-                                url=f'{self._ARISTON_URL}/R2/PlantMenu/Submit/{self._plant_id}',
-                                json_data=set_additional_params,
-                                error_msg='Set additional parameters',
-                                timeout=self._TIMEOUT_AV
-                            )
+                            self._api_client.submit_additional_params(
+                                self._plant_id, set_additional_params)
                     except Exception as ex:
                         self._LOGGER.warning(f"Problem setting multiple parameters: {ex}")
 
@@ -1801,12 +1601,8 @@ class AristonHandler:
         self._timer_queue_delay.cancel()
 
         if self._login and self.available:
-            self._request_get(
-                url=f'{self._ARISTON_URL}/R2/Account/Logout',
-                error_msg="Logout",
-                ignore_errors=True
-            )
-        self._session.close()
+            self._api_client.logout()
+        self._api_client.close()
         self._clear_data()
         self._subscribers_statuses_inform()
         self._LOGGER.info("Connection stopped")
