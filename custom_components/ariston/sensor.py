@@ -292,14 +292,15 @@ class AristonSensor(SensorEntity):
             if self._state_class:
                 self._attrs["state_class"] = self._state_class
 
-            # For energy sensors, extract period-end time from attribute keys
-            # Attribute keys follow format: "YYYY_MMM_DD_HH" (e.g., "2024_Dec_25_16")
-            if self._sensor_type in [PARAM_CH_ENERGY2_TODAY, PARAM_DHW_ENERGY2_TODAY] and self._attrs:
+            # For energy sensors, derive period-start time from attribute keys
+            # Attribute keys follow format: "YYYY_MMM_DD_HH" where HH denotes period end
+            # Apply to all sensors with device class ENERGY, including HP_* energy sensors
+            if self._attrs and self._device_class == SensorDeviceClass.ENERGY:
                 # Get first (most recent) attribute key to extract timestamp
                 attr_keys = [k for k in self._attrs.keys(
                 ) if '_' in k and k[0].isdigit()]
                 if attr_keys:
-                    # Parse the first key to get period-end time
+                    # Parse the first key to get period end, then shift to start
                     parts = attr_keys[0].split('_')
                     if len(parts) >= 4:
                         try:
@@ -308,12 +309,10 @@ class AristonSensor(SensorEntity):
                             day = int(parts[2])
                             hour = int(parts[3])
 
-                            # Set timestamp to 1 second before the period end
-                            # (e.g., 15:59:59 for 14:00-16:00 period, 23:59:59 for 22:00-00:00 period)
-                            # This keeps the value within the correct day's statistics
+                            # Compute period start assuming 2-hour slices: start = end - 2 hours
                             period_end = datetime(year, month, day, hour, 0, 0)
-                            self._attr_last_updated = period_end - \
-                                timedelta(seconds=1)
+                            period_start = period_end - timedelta(hours=2)
+                            self._attr_last_updated = period_start
                         except (ValueError, IndexError):
                             self._attr_last_updated = None
                     else:
