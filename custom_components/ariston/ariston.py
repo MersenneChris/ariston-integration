@@ -5,6 +5,8 @@ import datetime
 import logging
 import re
 import threading
+import json
+import os
 from typing import Union
 
 from .api_client import AristonApiClient
@@ -465,6 +467,10 @@ class AristonHandler:
 
         self._max_zones = max_zones
 
+        # Cache manifest version for the integration (loaded lazily)
+        self._manifest_version = None
+        self._manifest_path = os.path.join(os.path.dirname(__file__), "manifest.json")
+
         if sensors:
             for sensor in sensors:
                 if sensor not in self._SENSOR_LIST:
@@ -729,8 +735,16 @@ class AristonHandler:
 
     @property
     def version(self) -> str:
-        """Return version of the API in use."""
-        return self._VERSION
+        """Return version of the installed integration (manifest version)."""
+        try:
+            if self._manifest_version is None:
+                with open(self._manifest_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    self._manifest_version = data.get("version", self._VERSION)
+            return self._manifest_version
+        except Exception:
+            # Fallback to internal API version if manifest is unavailable
+            return self._VERSION
 
 
     @property
