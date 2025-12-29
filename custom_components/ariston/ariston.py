@@ -1067,10 +1067,14 @@ class AristonHandler:
                     return
 
             self._energy_use_data = copy.deepcopy(resp.json())
-            this_month = datetime.date.today().month
-            this_year = datetime.date.today().year
-            this_day = datetime.date.today().day
-            this_hour = datetime.datetime.now().hour
+            # Shift reference time back by 2 hours so that the final 2-hour slot
+            # (arriving right after midnight) is still attributed to the
+            # previous day instead of being wiped by the daily reset.
+            reference_dt = datetime.datetime.now() - datetime.timedelta(hours=2)
+            this_month = reference_dt.month
+            this_year = reference_dt.year
+            this_day = reference_dt.day
+            this_hour = reference_dt.hour
             CH_ENERGY2 = 1
             DHW_ENERGY2 = 2
             # 2hour during scanning is decreased by 2 at the beginning
