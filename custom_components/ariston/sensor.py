@@ -183,7 +183,6 @@ class AristonSensor(SensorEntity):
         self._icon = SENSORS[sensor_type][2]
         self._device_class = SENSORS[sensor_type][1]
         self._state_class = SENSORS[sensor_type][3]
-        self._attr_last_updated = None
 
     @property
     def unique_id(self):
@@ -273,7 +272,6 @@ class AristonSensor(SensorEntity):
         try:
             if self._sensor_type == PARAM_VERSION:
                 self._state = self._api.version
-                self._attr_last_updated = None
                 return
             if not self._api.available:
                 return
@@ -291,37 +289,6 @@ class AristonSensor(SensorEntity):
                     self._attrs[STEP] = self._api.sensor_values[self._sensor_type][STEP]
             if self._state_class:
                 self._attrs["state_class"] = self._state_class
-
-            # For energy sensors, derive period-start time from attribute keys
-            # Attribute keys follow format: "YYYY_MMM_DD_HH" where HH denotes period end
-            # Apply to all sensors with device class ENERGY, including HP_* energy sensors
-            if self._attrs and self._device_class == SensorDeviceClass.ENERGY:
-                # Get first (most recent) attribute key to extract timestamp
-                attr_keys = [k for k in self._attrs.keys(
-                ) if '_' in k and k[0].isdigit()]
-                if attr_keys:
-                    # Parse the first key to get period end, then shift to start
-                    parts = attr_keys[0].split('_')
-                    if len(parts) >= 4:
-                        try:
-                            year = int(parts[0])
-                            month = list(calendar.month_abbr).index(parts[1])
-                            day = int(parts[2])
-                            hour = int(parts[3])
-
-                            # Compute period start assuming 2-hour slices: start = end - 2 hours
-                            period_end = datetime(year, month, day, hour, 0, 0)
-                            period_start = period_end - timedelta(hours=2)
-                            self._attr_last_updated = period_start
-                        except (ValueError, IndexError):
-                            self._attr_last_updated = None
-                    else:
-                        self._attr_last_updated = None
-                else:
-                    self._attr_last_updated = None
-            else:
-                # For non-energy sensors, use current time (default behavior)
-                self._attr_last_updated = None
 
         except KeyError:
             _LOGGER.warning("Problem updating sensors for Ariston")

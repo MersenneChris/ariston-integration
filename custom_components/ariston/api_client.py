@@ -1,5 +1,4 @@
 """Ariston API client for HTTP communication."""
-import logging
 import threading
 import requests
 
@@ -133,24 +132,6 @@ class AristonApiClient:
             url=f'{self._ARISTON_URL}/R2/PlantMenu/Refresh?id={plant_id}&paramIds={",".join(param_ids)}',
             timeout=self._TIMEOUT_AV,
             error_msg="Additional data read"
-        )
-        return resp
-
-    def get_last_month_data(self, plant_id):
-        """Fetch last month energy data."""
-        resp = self.request_get(
-            url=f'{self._ARISTON_URL}/api/v2/remote/reports/{plant_id}/energyAccount',
-            timeout=self._TIMEOUT_AV,
-            error_msg="Last month data read"
-        )
-        return resp
-
-    def get_energy_data(self, plant_id):
-        """Fetch energy consumption data."""
-        resp = self.request_get(
-            url=f'{self._ARISTON_URL}/api/v2/remote/reports/{plant_id}/consSequencesApi8?usages=Ch%2CDhw&hasSlp=False',
-            timeout=self._TIMEOUT_AV,
-            error_msg="Energy data read"
         )
         return resp
 

@@ -1,5 +1,4 @@
 """Suppoort for Ariston."""
-import calendar
 import copy
 import datetime
 import logging
@@ -97,8 +96,6 @@ class AristonHandler:
     _PARAM_PRESSURE = "pressure"
     _PARAM_CH_FLOW_TEMP = 'ch_flow_temperature'
     _PARAM_CH_FIXED_TEMP = 'ch_fixed_temperature'
-    _PARAM_CH_LAST_MONTH_ELECTRICITY = 'ch_electricity_last_month'
-    _PARAM_DHW_LAST_MONTH_ELECTRICITY = 'dhw_electricity_last_month'
     _PARAM_CH_ENERGY2_TODAY = 'ch_energy2_today'
     _PARAM_DHW_ENERGY2_TODAY = 'dhw_energy2_today'
     _PARAM_HP_CH_PRODUCED_TODAY = 'hp_ch_produced_today'
@@ -246,17 +243,7 @@ class AristonHandler:
     _LIST_DHW_PROGRAM_PARAMS = [
         _PARAM_DHW_PROGRAM
     ]
-    # Sensors in last month energy
-    _LIST_LAST_MONTH = [
-        _PARAM_CH_LAST_MONTH_ELECTRICITY,
-        _PARAM_DHW_LAST_MONTH_ELECTRICITY,
-    ]
-    # Energy data - only tracking today's energy
-    _LIST_ENERGY = [
-        _PARAM_CH_ENERGY2_TODAY,
-        _PARAM_DHW_ENERGY2_TODAY,
-    ]
-    # Heat pump produced energy data - today's produced energy
+    # Heat pump produced/consumed energy data - today's values
     _LIST_HP_ENERGY = [
         _PARAM_HP_CH_PRODUCED_TODAY,
         _PARAM_HP_DHW_PRODUCED_TODAY,
@@ -270,11 +257,11 @@ class AristonHandler:
     ]
 
     # reverse mapping of Android api to sensor names
-    _MAP_ARISTON_API_TO_PARAM = {value:key for key, value in _MAP_ARISTON_ZONE_0_PARAMS.items()}
+    _MAP_ARISTON_API_TO_PARAM = {value: key for key, value in _MAP_ARISTON_ZONE_0_PARAMS.items()}
     for key, value in _MAP_ARISTON_MULTIZONE_PARAMS.items():
         _MAP_ARISTON_API_TO_PARAM[value] = key
     # reverse mapping of Web menu items to sensor names
-    _MAP_ARISTON_WEB_TO_PARAM = {value:key for key, value in _MAP_ARISTON_WEB_MENU_PARAMS.items()}
+    _MAP_ARISTON_WEB_TO_PARAM = {value: key for key, value in _MAP_ARISTON_WEB_MENU_PARAMS.items()}
 
     # List of all sensors
     _SENSOR_LIST = [
@@ -283,11 +270,9 @@ class AristonHandler:
         *_LIST_ERROR_PARAMS,
         *_LIST_CH_PROGRAM_PARAMS,
         *_LIST_DHW_PROGRAM_PARAMS,
-        *_LIST_LAST_MONTH,
-        *_LIST_ENERGY,
         *_LIST_HP_ENERGY,
         ]
-    
+
     # List of sensors allowed to be changed
     _SENSOR_SET_LIST_TEMP = [
         _PARAM_MODE,
@@ -326,8 +311,6 @@ class AristonHandler:
     _REQUEST_DHW_SCHEDULE = "dhw_schedule"
     _REQUEST_ERRORS = "errors"
     _REQUEST_ADDITIONAL = "additional_params"
-    _REQUEST_LAST_MONTH = "last_month"
-    _REQUEST_ENERGY = "energy"
     _REQUEST_HP_ENERGY = "hp_energy"
 
     maim_sensors_list = []
@@ -341,8 +324,6 @@ class AristonHandler:
         _REQUEST_CH_SCHEDULE: _LIST_CH_PROGRAM_PARAMS,
         _REQUEST_DHW_SCHEDULE: _LIST_DHW_PROGRAM_PARAMS,
         _REQUEST_ERRORS: _LIST_ERROR_PARAMS,
-        _REQUEST_ENERGY: _LIST_ENERGY,
-        _REQUEST_LAST_MONTH: _LIST_LAST_MONTH,
         _REQUEST_HP_ENERGY: _LIST_HP_ENERGY,
     }
 
@@ -361,8 +342,6 @@ class AristonHandler:
         [
             _REQUEST_CH_SCHEDULE,
             _REQUEST_DHW_SCHEDULE,
-            _REQUEST_LAST_MONTH,
-            _REQUEST_ENERGY,
             _REQUEST_HP_ENERGY
         ]
     ]
@@ -505,8 +484,6 @@ class AristonHandler:
         self._error_data = {}
         self._ch_schedule_data = {}
         self._dhw_schedule_data = {}
-        self._last_month_data = {}
-        self._energy_use_data = {}
         self._hp_energy_data = {}
         self._zones = []
 
@@ -1031,92 +1008,6 @@ class AristonHandler:
                     self._LOGGER.warn(f'Issue reading {request_type} {item["id"]}, {ex}')
                     continue
 
-        elif request_type == self._REQUEST_LAST_MONTH:
-
-            self._last_month_data = copy.deepcopy(resp.json())
-            self._reset_sensor(self._PARAM_CH_LAST_MONTH_ELECTRICITY)
-            self._reset_sensor(self._PARAM_DHW_LAST_MONTH_ELECTRICITY)
-            for item in self._last_month_data["LastMonth"]:
-                try:
-                    if item["use"] == 1:
-                        if "elect" in item:
-                            sensor = self._PARAM_CH_LAST_MONTH_ELECTRICITY
-                            self._ariston_sensors[sensor][self._VALUE] = item["elect"]
-                            self._ariston_sensors[sensor][self._UNITS] = self._UNIT_KWH
-                    if item["use"] == 2:
-                        if "elect" in item:
-                            sensor = self._PARAM_DHW_LAST_MONTH_ELECTRICITY
-                            self._ariston_sensors[sensor][self._VALUE] = item["elect"]
-                            self._ariston_sensors[sensor][self._UNITS] = self._UNIT_KWH
-                except Exception as ex:
-                    self._LOGGER.warn(f'Issue reading {request_type} {item["use"]} for last month, {ex}')
-                    continue
-
-        elif request_type == self._REQUEST_ENERGY:
-
-            if self._energy_use_data:
-                # old values are available
-                sum_energy_old = 0
-                sum_energy_new = 0
-                for item in self._energy_use_data:
-                    sum_energy_old += sum(item['v'])
-                for item in resp.json():
-                    sum_energy_new += sum(item['v'])
-                if sum_energy_old > 0 and sum_energy_new == 0:
-                    # if non-zero values are present and new value is zero - ignore it 
-                    return
-
-            self._energy_use_data = copy.deepcopy(resp.json())
-            # Shift reference time back by 2 hours so that the final 2-hour slot
-            # (arriving right after midnight) is still attributed to the
-            # previous day instead of being wiped by the daily reset.
-            reference_dt = datetime.datetime.now() - datetime.timedelta(hours=2)
-            this_month = reference_dt.month
-            this_year = reference_dt.year
-            this_day = reference_dt.day
-            this_hour = reference_dt.hour
-            CH_ENERGY2 = 1
-            DHW_ENERGY2 = 2
-            # 2hour during scanning is decreased by 2 at the beginning
-            if this_hour % 2 == 1:
-                # odd value means we calculate even value and add 2 hours due to following decrease
-                this_2hour = (this_hour // 2) * 2 + 2
-            else:
-                # we assume that previous 2 hours would be used
-                this_2hour = this_hour + 2
-            try:
-                (
-                    self._ariston_sensors[self._PARAM_CH_ENERGY2_TODAY][self._VALUE],
-                    self._ariston_sensors[self._PARAM_CH_ENERGY2_TODAY][self._ATTRIBUTES],
-                    found_key,
-                ) = self._get_energy_data(
-                    CH_ENERGY2,
-                    this_year=this_year,
-                    this_month=this_month,
-                    this_day=this_day,
-                    this_2hour=this_2hour)
-                if found_key:
-                    self._ariston_sensors[self._PARAM_CH_ENERGY2_TODAY][self._UNITS] = self._UNIT_KWH
-            except Exception as ex:
-                self._LOGGER.warn(f'Issue handling energy used for CH 2, {ex}')
-                self._reset_sensor(self._PARAM_CH_ENERGY2_TODAY)
-            try:
-                (
-                    self._ariston_sensors[self._PARAM_DHW_ENERGY2_TODAY][self._VALUE],
-                    self._ariston_sensors[self._PARAM_DHW_ENERGY2_TODAY][self._ATTRIBUTES],
-                    found_key,
-                ) = self._get_energy_data(
-                    DHW_ENERGY2,
-                    this_year=this_year,
-                    this_month=this_month,
-                    this_day=this_day,
-                    this_2hour=this_2hour)
-                if found_key:
-                    self._ariston_sensors[self._PARAM_DHW_ENERGY2_TODAY][self._UNITS] = self._UNIT_KWH
-            except Exception as ex:
-                self._LOGGER.warn(f'Issue handling energy used for DHW 2, {ex}')
-                self._reset_sensor(self._PARAM_DHW_ENERGY2_TODAY)
-
         elif request_type == self._REQUEST_HP_ENERGY:
 
             self._hp_energy_data = copy.deepcopy(resp.json())
@@ -1297,91 +1188,6 @@ class AristonHandler:
 
         self._subscribers_sensors_inform()
 
-    def _get_energy_data(self, k_num, this_year, this_month, this_day, this_2hour):
-        """
-        Extract energy data for today from the API response.
-        
-        Args:
-            k_num: Energy type (1 for CH, 2 for DHW)
-            this_year, this_month, this_day: Current date
-            this_2hour: Current 2-hour period
-            
-        Returns:
-            Tuple of (energy_today, energy_today_attr, found_key)
-        """
-        energy_today = 0
-        energy_today_attr = {}
-        hour_text = "{}_{}_{:02}_{:02}:{:02}"
-        found_key = False
-
-        for item in self._energy_use_data:
-            if item["k"] == k_num:
-                found_key = True
-                # Only process p==1 (today's 2-hour data)
-                if item['p'] == 1:
-                    scan_2hour = this_2hour
-                    scan_break = 0
-
-                    for value in reversed(item['v']):
-                        scan_2hour, scan_break = self._get_prev_hour(hour=scan_2hour, scan_break=scan_break)
-                        # Skip the 22:00–00:00 bin (end time 00:00) which belongs to the previous day
-                        if scan_2hour == 0:
-                            # Mark that we've crossed into previous day for subsequent iterations
-                            scan_break = max(scan_break, 1)
-                            continue
-
-                        # Apply 2-hour offset: timestamp represents END of period (when data becomes available)
-                        # Store as HH:59 for the end-of-slot time
-                        store_hour = scan_2hour - 1
-                        store_minute = 59
-                        store_day, store_month, store_year = this_day, this_month, this_year
-                        day_offset = scan_break
-
-                        if store_hour > 23:
-                            # Hour wraps to next day (00:00 or 02:00)
-                            store_hour = store_hour - 24
-                            day_offset += 1
-
-                        # Shift the attribute date by the accumulated offset to align with the correct day
-                        for _ in range(day_offset):
-                            store_day, store_month, store_year, _ = self._get_prev_day(day=store_day, month=store_month, year=store_year, scan_break=0)
-
-                        if day_offset > 0:
-                            # Data belongs to yesterday, skip (only today's data is used)
-                            continue
-
-                        energy_today_attr[hour_text.format(
-                            store_year, calendar.month_abbr[store_month], store_day, store_hour, store_minute)] = value
-                        energy_today += value
-
-        if not found_key:
-            energy_today = None
-            energy_today_attr = {}
-
-        return (energy_today, energy_today_attr, found_key)
-
-
-
-
-    def _get_prev_day(self, day, month, year, scan_break):
-        if day > 1:
-            return day - 1, month, year, scan_break
-        else:
-            if month > 1:
-                return calendar.monthrange(year=year, month=month - 1)[1], month - 1, year, scan_break + 1
-            else:
-                return calendar.monthrange(year=year, month=12)[1], 12, year - 1, scan_break + 1
-
-
-
-
-    def _get_prev_hour(self, hour, scan_break):
-        if hour > 0:
-            return hour - 2, scan_break
-        else:
-            return 22, scan_break + 1
-
-
     def _get_http_data(self, request_type=""):
         """Common fetching of http data"""
         self._login_session()
@@ -1423,16 +1229,6 @@ class AristonHandler:
                 with self._data_lock:
                     resp = self._api_client.get_additional_data(
                         self._plant_id, self._other_parameters)
-                    self._store_data(resp, request_type)
-
-            elif request_type == self._REQUEST_LAST_MONTH:
-                with self._data_lock:
-                    resp = self._api_client.get_last_month_data(self._plant_id)
-                    self._store_data(resp, request_type)
-
-            elif request_type == self._REQUEST_ENERGY:
-                with self._data_lock:
-                    resp = self._api_client.get_energy_data(self._plant_id)
                     self._store_data(resp, request_type)
 
             elif request_type == self._REQUEST_HP_ENERGY:
@@ -1805,8 +1601,6 @@ class AristonHandler:
         self._ch_schedule_data = {}
         self._dhw_schedule_data = {}
         self._set_param = {}
-        self._last_month_data = {}
-        self._energy_use_data = {}
         self._last_dhw_storage_temp = None
         self._zones = []
         for sensor in self._ariston_sensors:
