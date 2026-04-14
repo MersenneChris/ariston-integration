@@ -72,6 +72,8 @@ _HP_STATS_PARAMS = (
     PARAM_HP_DHW_PRODUCED_TODAY,
     PARAM_HP_CH_CONSUMED_TODAY,
     PARAM_HP_DHW_CONSUMED_TODAY,
+    CONF_HP_SLOT_MODE,
+    HP_SLOT_MODE_SPLIT,
 )
 
 PLATFORMS = [
@@ -171,6 +173,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     _LOGGER.info("Ariston API started for %s", name)
 
     if _RECORDER_STATS_AVAILABLE:
+        hp_slot_mode = options.get(CONF_HP_SLOT_MODE, HP_SLOT_MODE_SPLIT)
+        _LOGGER.info("HP slot mode: %s", hp_slot_mode)
         imported_slots_by_stat_id = {}
         running_sum_by_stat_id = {}
 
@@ -266,18 +270,40 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                     if slot_key in imported_starts:
                         continue
 
-                    running_sum_by_stat_id[statistic_id] = round(
-                        running_sum_by_stat_id[statistic_id] + slot_value,
-                        6,
-                    )
-                    imported_starts.add(slot_key)
-                    stats_payload.append(
-                        StatisticData(
-                            start=slot_start,
-                            state=slot_value,
-                            sum=running_sum_by_stat_id[statistic_id],
+                    if hp_slot_mode == HP_SLOT_MODE_SPLIT:
+                        # Divide the 2-hour bucket evenly across two 1-hour records.
+                        half_value = round(slot_value / 2, 6)
+                        for offset_hours in (0, 1):
+                            hour_start = slot_start + timedelta(hours=offset_hours)
+                            hour_key = hour_start.isoformat()
+                            if hour_key in imported_starts:
+                                continue
+                            running_sum_by_stat_id[statistic_id] = round(
+                                running_sum_by_stat_id[statistic_id] + half_value,
+                                6,
+                            )
+                            imported_starts.add(hour_key)
+                            stats_payload.append(
+                                StatisticData(
+                                    start=hour_start,
+                                    state=half_value,
+                                    sum=running_sum_by_stat_id[statistic_id],
+                                )
+                            )
+                    else:
+                        # Verbatim: one record at the slot start with the full value.
+                        running_sum_by_stat_id[statistic_id] = round(
+                            running_sum_by_stat_id[statistic_id] + slot_value,
+                            6,
                         )
-                    )
+                        imported_starts.add(slot_key)
+                        stats_payload.append(
+                            StatisticData(
+                                start=slot_start,
+                                state=slot_value,
+                                sum=running_sum_by_stat_id[statistic_id],
+                            )
+                        )
 
                 if not stats_payload:
                     continue

@@ -14,6 +14,9 @@ from .const import (
     CONF_PERIOD_GET,
     CONF_MAX_SET_RETRIES,
     CONF_CH_ZONES,
+    CONF_HP_SLOT_MODE,
+    HP_SLOT_MODE_VERBATIM,
+    HP_SLOT_MODE_SPLIT,
 )
 
 DEFAULT_NAME = "Ariston"
@@ -22,6 +25,7 @@ DEFAULT_PERIOD_GET = 30
 DEFAULT_PERIOD_SET = 30
 DEFAULT_LOG = "WARNING"
 DEFAULT_CH_ZONES = 1
+DEFAULT_HP_SLOT_MODE = HP_SLOT_MODE_SPLIT
 
 
 class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -142,6 +146,10 @@ class AristonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_CH_ZONES,
                     default=options.get(CONF_CH_ZONES, DEFAULT_CH_ZONES),
                 ): vol.All(int, vol.Range(min=1, max=6)),
+                vol.Optional(
+                    CONF_HP_SLOT_MODE,
+                    default=options.get(CONF_HP_SLOT_MODE, DEFAULT_HP_SLOT_MODE),
+                ): vol.In([HP_SLOT_MODE_VERBATIM, HP_SLOT_MODE_SPLIT]),
             }
         )
 
@@ -182,6 +190,10 @@ class AristonOptionsFlowHandler(config_entries.OptionsFlow):
                     CONF_CH_ZONES,
                     default=options.get(CONF_CH_ZONES, DEFAULT_CH_ZONES),
                 ): vol.All(int, vol.Range(min=1, max=6)),
+                vol.Optional(
+                    CONF_HP_SLOT_MODE,
+                    default=options.get(CONF_HP_SLOT_MODE, DEFAULT_HP_SLOT_MODE),
+                ): vol.In([HP_SLOT_MODE_VERBATIM, HP_SLOT_MODE_SPLIT]),
             }
         )
 

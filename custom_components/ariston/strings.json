@@ -30,7 +30,8 @@
           "period_set": "Set period (seconds, 30-3600)",
           "max_set_retries": "Max set retries (1-10)",
           "logging": "Logging level",
-          "num_ch_zones": "Number of CH zones (1-6)"
+          "num_ch_zones": "Number of CH zones (1-6)",
+          "hp_slot_mode": "Energy slot granularity (verbatim = 2-hour slots as-is; split = divide evenly across two 1-hour slots)"
         }
       }
     }
