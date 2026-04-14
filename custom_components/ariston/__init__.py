@@ -16,8 +16,9 @@ from homeassistant.const import (
 )
 
 try:
-    from homeassistant.components.recorder.statistics import async_import_statistics
+    from homeassistant.components.recorder.statistics import async_import_statistics, get_last_statistics
     from homeassistant.components.recorder.models import StatisticData, StatisticMetaData
+    from homeassistant.components.recorder import get_instance as _get_recorder_instance
     _RECORDER_STATS_AVAILABLE = True
 except Exception:
     _RECORDER_STATS_AVAILABLE = False
@@ -169,6 +170,45 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             sensor_name = sensors_default[sensor_param][0]
             return f"sensor.{slugify(f'{name} {sensor_name}')}"
 
+        async def _get_db_baseline_sum(statistic_id: str) -> float:
+            """Return the last cumulative sum stored before today's midnight.
+
+            Queried directly from the recorder DB so the value survives HA restarts.
+            Falls back to 0.0 when no prior data exists (first-ever run).
+            """
+            today_midnight_utc = dt_util.as_utc(
+                dt_util.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            )
+            today_midnight_ts = today_midnight_utc.timestamp()
+            try:
+                last_stats = await _get_recorder_instance(hass).async_add_executor_job(
+                    get_last_statistics, hass, 24, statistic_id, False, {"sum", "start"}
+                )
+            except Exception as ex:  # noqa: BLE001
+                _LOGGER.warning("Could not query DB baseline for %s: %s", statistic_id, ex)
+                return 0.0
+
+            entries = last_stats.get(statistic_id, [])
+            if not entries:
+                return 0.0
+
+            # Find the most recent entry whose slot started before today midnight (UTC).
+            # 'start' may be a datetime or a float epoch depending on HA version.
+            def _entry_ts(entry):
+                s = entry.get("start")
+                if s is None:
+                    return float("inf")
+                return s.timestamp() if hasattr(s, "timestamp") else float(s)
+
+            prev_entries = [e for e in entries if _entry_ts(e) < today_midnight_ts]
+            if not prev_entries:
+                return 0.0
+
+            prev_entries.sort(key=_entry_ts, reverse=True)
+            baseline = float(prev_entries[0].get("sum") or 0.0)
+            _LOGGER.debug("DB baseline for %s: %.6f", statistic_id, baseline)
+            return baseline
+
         async def _async_import_hp_slot_statistics(changed_data: dict):
             if "recorder" not in hass.config.components:
                 return
@@ -207,12 +247,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 imported_starts = imported_slots_by_stat_id.setdefault(statistic_id, set())
 
                 if statistic_id not in running_sum_by_stat_id:
-                    try:
-                        current_total = float(sensor_data.get("value", 0) or 0)
-                    except (TypeError, ValueError):
-                        current_total = 0.0
-                    known_slots_total = sum(value for _, value in slot_points)
-                    running_sum_by_stat_id[statistic_id] = max(current_total - known_slots_total, 0.0)
+                    # Seed from the last sum written to the recorder DB before today.
+                    # Using the live sensor value here is unreliable after HA restarts
+                    # because the sensor starts at 0 until the first API poll completes.
+                    running_sum_by_stat_id[statistic_id] = await _get_db_baseline_sum(statistic_id)
 
                 stats_payload = []
                 for slot_start, slot_value in slot_points:
