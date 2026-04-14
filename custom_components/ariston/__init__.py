@@ -91,24 +91,32 @@ async def async_setup(hass: HomeAssistant, config: dict):
 
 
 def _parse_slot_start_from_range(slot_label: str, now: Optional[datetime] = None) -> Optional[datetime]:
-    """Convert labels like '02-04 AM' into a datetime at the slot start."""
+    """Convert labels like '02-04 AM' into a datetime at the slot start.
+
+    The Ariston API attaches the AM/PM marker to the END hour of each 2-hour slot:
+      '10-12 PM' = 10:00-12:00 (ends at 12 PM / noon)
+      '10-12 AM' = 22:00-00:00 (ends at 12 AM / midnight)
+    We resolve the end hour to 24-hour time using its AM/PM, then subtract 2 hours.
+    """
     match = re.match(r"^\s*(\d{1,2})\s*-\s*(\d{1,2})\s*([AP]M)\s*$", str(slot_label), re.IGNORECASE)
     if not match:
         return None
 
-    start_hour = int(match.group(1))
+    end_hour = int(match.group(2))
     period = match.group(3).upper()
 
-    if period == "PM" and start_hour != 12:
-        start_hour += 12
-    elif period == "AM" and start_hour == 12:
-        start_hour = 0
+    if period == "PM" and end_hour != 12:
+        end_hour += 12
+    elif period == "AM" and end_hour == 12:
+        end_hour = 0
+
+    start_hour = (end_hour - 2) % 24
 
     if now is None:
         now = dt_util.now()
     start_dt = now.replace(hour=start_hour, minute=0, second=0, microsecond=0)
 
-    # API reports at end-of-window. If parsed start is in the future, treat as previous day.
+    # If the slot start is in the future it belongs to the previous day.
     if start_dt > now:
         start_dt -= timedelta(days=1)
 
