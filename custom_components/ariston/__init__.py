@@ -6,7 +6,7 @@ from typing import Optional
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.util import slugify
+from homeassistant.util import slugify, dt as dt_util
 from homeassistant.const import (
     ATTR_ENTITY_ID,
     CONF_NAME,
@@ -89,7 +89,7 @@ async def async_setup(hass: HomeAssistant, config: dict):
     return True
 
 
-def _parse_slot_start_from_range(slot_label: str) -> Optional[datetime]:
+def _parse_slot_start_from_range(slot_label: str, now: Optional[datetime] = None) -> Optional[datetime]:
     """Convert labels like '02-04 AM' into a datetime at the slot start."""
     match = re.match(r"^\s*(\d{1,2})\s*-\s*(\d{1,2})\s*([AP]M)\s*$", str(slot_label), re.IGNORECASE)
     if not match:
@@ -103,7 +103,8 @@ def _parse_slot_start_from_range(slot_label: str) -> Optional[datetime]:
     elif period == "AM" and start_hour == 12:
         start_hour = 0
 
-    now = datetime.now()
+    if now is None:
+        now = dt_util.now()
     start_dt = now.replace(hour=start_hour, minute=0, second=0, microsecond=0)
 
     # API reports at end-of-window. If parsed start is in the future, treat as previous day.
@@ -183,9 +184,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 if not isinstance(attributes, dict):
                     continue
 
+                now = dt_util.now()
                 slot_points = []
                 for key, raw_value in attributes.items():
-                    slot_start = _parse_slot_start_from_range(key)
+                    slot_start = _parse_slot_start_from_range(key, now)
                     if slot_start is None:
                         continue
                     try:
