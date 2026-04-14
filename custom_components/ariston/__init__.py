@@ -1,12 +1,12 @@
 """Support for Ariston."""
 import logging
 import re
-import calendar
 from datetime import datetime, timedelta
+from typing import Optional
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.util import slugify
 from homeassistant.const import (
     ATTR_ENTITY_ID,
     CONF_NAME,
@@ -14,6 +14,13 @@ from homeassistant.const import (
     CONF_USERNAME,
     Platform,
 )
+
+try:
+    from homeassistant.components.recorder.statistics import async_import_statistics
+    from homeassistant.components.recorder.models import StatisticData, StatisticMetaData
+    _RECORDER_STATS_AVAILABLE = True
+except Exception:
+    _RECORDER_STATS_AVAILABLE = False
 
 from .ariston import AristonHandler
 from .const import param_zoned
@@ -43,6 +50,10 @@ from .const import (
     PARAM_CHANGING_DATA,
     PARAM_VERSION,
     PARAM_THERMAL_CLEANSE_FUNCTION,
+    PARAM_HP_CH_PRODUCED_TODAY,
+    PARAM_HP_DHW_PRODUCED_TODAY,
+    PARAM_HP_CH_CONSUMED_TODAY,
+    PARAM_HP_DHW_CONSUMED_TODAY,
 )
 from .sensor import sensors_default
 from .switch import switches_default
@@ -54,6 +65,13 @@ DEFAULT_PERIOD_GET = 30
 DEFAULT_PERIOD_SET = 30
 
 _LOGGER = logging.getLogger(__name__)
+
+_HP_STATS_PARAMS = (
+    PARAM_HP_CH_PRODUCED_TODAY,
+    PARAM_HP_DHW_PRODUCED_TODAY,
+    PARAM_HP_CH_CONSUMED_TODAY,
+    PARAM_HP_DHW_CONSUMED_TODAY,
+)
 
 PLATFORMS = [
     Platform.CLIMATE,
@@ -69,6 +87,30 @@ async def async_setup(hass: HomeAssistant, config: dict):
     """Set up the Ariston component."""
     hass.data.setdefault(DATA_ARISTON, {DEVICES: {}})
     return True
+
+
+def _parse_slot_start_from_range(slot_label: str) -> Optional[datetime]:
+    """Convert labels like '02-04 AM' into a datetime at the slot start."""
+    match = re.match(r"^\s*(\d{1,2})\s*-\s*(\d{1,2})\s*([AP]M)\s*$", str(slot_label), re.IGNORECASE)
+    if not match:
+        return None
+
+    start_hour = int(match.group(1))
+    period = match.group(3).upper()
+
+    if period == "PM" and start_hour != 12:
+        start_hour += 12
+    elif period == "AM" and start_hour == 12:
+        start_hour = 0
+
+    now = datetime.now()
+    start_dt = now.replace(hour=start_hour, minute=0, second=0, microsecond=0)
+
+    # API reports at end-of-window. If parsed start is in the future, treat as previous day.
+    if start_dt > now:
+        start_dt -= timedelta(days=1)
+
+    return start_dt
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
@@ -117,6 +159,100 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     # Start api execution
     api.ariston_api.start()
     _LOGGER.info("Ariston API started for %s", name)
+
+    if _RECORDER_STATS_AVAILABLE:
+        imported_slots_by_stat_id = {}
+        running_sum_by_stat_id = {}
+
+        def _statistic_id_from_param(sensor_param: str) -> str:
+            sensor_name = sensors_default[sensor_param][0]
+            return f"sensor.{slugify(f'{name} {sensor_name}')}"
+
+        async def _async_import_hp_slot_statistics(changed_data: dict):
+            if "recorder" not in hass.config.components:
+                return
+
+            if not any(sensor in changed_data for sensor in _HP_STATS_PARAMS):
+                return
+
+            sensor_values = api.ariston_api.sensor_values
+
+            for sensor_param in _HP_STATS_PARAMS:
+                sensor_data = sensor_values.get(sensor_param, {})
+                attributes = sensor_data.get("attributes") or {}
+                if not isinstance(attributes, dict):
+                    continue
+
+                slot_points = []
+                for key, raw_value in attributes.items():
+                    slot_start = _parse_slot_start_from_range(key)
+                    if slot_start is None:
+                        continue
+                    try:
+                        slot_value = float(raw_value)
+                    except (TypeError, ValueError):
+                        continue
+                    if slot_value < 0:
+                        continue
+                    slot_points.append((slot_start, slot_value))
+
+                if not slot_points:
+                    continue
+
+                slot_points.sort(key=lambda item: item[0])
+
+                statistic_id = _statistic_id_from_param(sensor_param)
+                imported_starts = imported_slots_by_stat_id.setdefault(statistic_id, set())
+
+                if statistic_id not in running_sum_by_stat_id:
+                    try:
+                        current_total = float(sensor_data.get("value", 0) or 0)
+                    except (TypeError, ValueError):
+                        current_total = 0.0
+                    known_slots_total = sum(value for _, value in slot_points)
+                    running_sum_by_stat_id[statistic_id] = max(current_total - known_slots_total, 0.0)
+
+                stats_payload = []
+                for slot_start, slot_value in slot_points:
+                    slot_key = slot_start.isoformat()
+                    if slot_key in imported_starts:
+                        continue
+
+                    running_sum_by_stat_id[statistic_id] = round(
+                        running_sum_by_stat_id[statistic_id] + slot_value,
+                        6,
+                    )
+                    imported_starts.add(slot_key)
+                    stats_payload.append(
+                        StatisticData(
+                            start=slot_start,
+                            state=slot_value,
+                            sum=running_sum_by_stat_id[statistic_id],
+                        )
+                    )
+
+                if not stats_payload:
+                    continue
+
+                metadata = StatisticMetaData(
+                    has_mean=False,
+                    has_sum=True,
+                    name=None,
+                    source="recorder",
+                    statistic_id=statistic_id,
+                    unit_of_measurement="kWh",
+                )
+                async_import_statistics(hass, metadata, stats_payload)
+
+        def _schedule_hp_statistics_import(changed_data, *_args, **_kwargs):
+            hass.loop.call_soon_threadsafe(
+                hass.async_create_task,
+                _async_import_hp_slot_statistics(changed_data),
+            )
+
+        api.ariston_api.subscribe_sensors(_schedule_hp_statistics_import)
+    else:
+        _LOGGER.warning("Recorder statistics helpers are unavailable; HP slot LTS import is disabled")
 
     climates = []
     for zone in range(1, num_ch_zones + 1):
@@ -211,72 +347,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         raise Exception("Corresponding entity_id for Ariston not found")
     
     hass.services.async_register(DOMAIN, SERVICE_SET_DATA, set_ariston_data)
-    
-    # One-off service to calibrate a daily utility meter by subtracting yesterday 22:00 block
-    async def calibrate_daily_meter(call: ServiceCall):
-        """Calibrate a utility meter to today's corrected value.
-        Expected data:
-          - meter_entity_id: utility_meter entity to calibrate
-          - source_entity_id: sensor entity providing today's cumulative value with hourly attributes
-          - yesterday_hour (optional): hour to subtract from yesterday (default 22)
-        """
-        meter_entity_id = call.data.get("meter_entity_id")
-        source_entity_id = call.data.get("source_entity_id")
-        yesterday_hour = int(call.data.get("yesterday_hour", 22))
-
-        if not meter_entity_id or not source_entity_id:
-            raise HomeAssistantError("meter_entity_id and source_entity_id are required")
-
-        if not hass.services.has_service("utility_meter", "calibrate"):
-            raise HomeAssistantError("utility_meter.calibrate service is not available")
-
-        meter_state = hass.states.get(meter_entity_id)
-        if not meter_state:
-            raise HomeAssistantError(f"Meter entity {meter_entity_id} is not available")
-
-        source_state = hass.states.get(source_entity_id)
-        if not source_state or source_state.state in {"unknown", "unavailable"}:
-            raise HomeAssistantError(f"Source entity {source_entity_id} is not available")
-
-        try:
-            source_value = float(source_state.state)
-        except (TypeError, ValueError):
-            raise HomeAssistantError(
-                f"Source entity {source_entity_id} state is not numeric: {source_state.state}"
-            )
-
-        today = datetime.now()
-        y = today - timedelta(days=1)
-        key = f"{y.year}_{calendar.month_abbr[y.month]}_{y.day:02}_{yesterday_hour:02}"
-        y22_val = 0.0
-        try:
-            y22_val = float(source_state.attributes.get(key, 0.0))
-        except (TypeError, ValueError):
-            y22_val = 0.0
-
-        corrected = max(source_value - y22_val, 0.0)
-
-        try:
-            await hass.services.async_call(
-                "utility_meter",
-                "calibrate",
-                {"entity_id": meter_entity_id, "value": corrected},
-                blocking=True,
-            )
-        except Exception as exc:
-            _LOGGER.error(
-                "Failed to calibrate %s from %s using key %s (corrected=%s): %s",
-                meter_entity_id,
-                source_entity_id,
-                key,
-                corrected,
-                exc,
-            )
-            raise HomeAssistantError(
-                f"Calibration failed: {exc}" if str(exc) else "Calibration failed"
-            )
-
-    hass.services.async_register(DOMAIN, "calibrate_daily_meter", calibrate_daily_meter)
     
     # Register update listener for options
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))

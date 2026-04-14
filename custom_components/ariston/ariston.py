@@ -885,8 +885,6 @@ class AristonHandler:
             for day_num in item["days"]:
                 attributes[self._WEEKDAYS[day_num]] = time_slices
         return attributes
-
-
     def _store_data(self, resp, request_type=""):
         """Store received dictionary"""
         if not self._json_validator(resp, request_type):
@@ -1067,52 +1065,76 @@ class AristonHandler:
                 self._reset_sensor(self._PARAM_HP_DHW_PRODUCED_TODAY)
 
             try:
-                # Find CurrentDay ConsumedElectricity for Heating
+                # 1. Store the previous value to compare
+                previous_val = self._ariston_sensors[self._PARAM_HP_CH_CONSUMED_TODAY].get(self._VALUE, 0)
+    
                 hp_ch_cons = 0
                 hp_ch_cons_attrs = {}
+                found_data = False
+
                 for item in histogram_data:
                     if (item.get('tab') == 'ConsumedElectricity' and
                         item.get('period') == 'CurrentDay' and
                             item.get('series') == 'Heating'):
-                        for data_point in item.get('items', []):
-                            hp_ch_cons += data_point.get('y', 0)
-                            hp_ch_cons_attrs[data_point.get(
-                                'x', '')] = data_point.get('y', 0)
+            
+                        data_points = item.get('items', [])
+                        if data_points:
+                            found_data = True
+                            for data_point in data_points:
+                                hp_ch_cons += data_point.get('y', 0)
+                                hp_ch_cons_attrs[data_point.get('x', '')] = data_point.get('y', 0)
                         break
 
-                self._ariston_sensors[self._PARAM_HP_CH_CONSUMED_TODAY][self._VALUE] = hp_ch_cons
-                self._ariston_sensors[self._PARAM_HP_CH_CONSUMED_TODAY][self._ATTRIBUTES] = hp_ch_cons_attrs
-                self._ariston_sensors[self._PARAM_HP_CH_CONSUMED_TODAY][self._UNITS] = self._UNIT_KWH
-                self._LOGGER.debug(
-                    f"HP ConsumedElectricity Heating today: total={hp_ch_cons} kWh; slots={len(hp_ch_cons_attrs)}")
+                # 2. Logic Guard: Only update if we found data AND it's not a suspicious drop
+                # Exception: Allow a drop if it's the first hour of the day (genuine reset)
+                is_midnight_window = datetime.datetime.now().hour == 0
+
+                if found_data:
+                    if round(hp_ch_cons, 3) >= round(previous_val, 3) or is_midnight_window:
+                        self._ariston_sensors[self._PARAM_HP_CH_CONSUMED_TODAY][self._VALUE] = hp_ch_cons
+                        self._ariston_sensors[self._PARAM_HP_CH_CONSUMED_TODAY][self._ATTRIBUTES] = hp_ch_cons_attrs
+                        self._ariston_sensors[self._PARAM_HP_CH_CONSUMED_TODAY][self._UNITS] = self._UNIT_KWH
+                    else:
+                        self._LOGGER.debug(f"Ignoring value drop: {hp_ch_cons} is less than {previous_val}")
+    
             except Exception as ex:
-                self._LOGGER.warn(
-                    f'Issue handling heat pump consumed electricity for CH, {ex}')
-                self._reset_sensor(self._PARAM_HP_CH_CONSUMED_TODAY)
+                self._LOGGER.warning(f'Issue handling heat pump consumed electricity, {ex}')
+                # NEVER call self._reset_sensor here; it forces the value to 0 and causes a spike
 
             try:
                 # Find CurrentDay ConsumedElectricity for DHW
+                # 1. Store the previous value to compare
+                previous_val = self._ariston_sensors[self._PARAM_HP_DHW_CONSUMED_TODAY].get(self._VALUE, 0)
                 hp_dhw_cons = 0
                 hp_dhw_cons_attrs = {}
+                found_data = False
+
                 for item in histogram_data:
                     if (item.get('tab') == 'ConsumedElectricity' and
                         item.get('period') == 'CurrentDay' and
                             item.get('series') == 'Dhw'):
-                        for data_point in item.get('items', []):
-                            hp_dhw_cons += data_point.get('y', 0)
-                            hp_dhw_cons_attrs[data_point.get(
-                                'x', '')] = data_point.get('y', 0)
+                        data_points = item.get('items', [])
+                        if data_points:
+                            found_data = True
+                            for data_point in data_points:
+                                hp_dhw_cons += data_point.get('y', 0)
+                                hp_dhw_cons_attrs[data_point.get(
+                                    'x', '')] = data_point.get('y', 0)
                         break
 
-                self._ariston_sensors[self._PARAM_HP_DHW_CONSUMED_TODAY][self._VALUE] = hp_dhw_cons
-                self._ariston_sensors[self._PARAM_HP_DHW_CONSUMED_TODAY][self._ATTRIBUTES] = hp_dhw_cons_attrs
-                self._ariston_sensors[self._PARAM_HP_DHW_CONSUMED_TODAY][self._UNITS] = self._UNIT_KWH
-                self._LOGGER.debug(
-                    f"HP ConsumedElectricity DHW today: total={hp_dhw_cons} kWh; slots={len(hp_dhw_cons_attrs)}")
+                # 2. Logic Guard: Only update if we found data AND it's not a suspicious drop
+                # Exception: Allow a drop if it's the first hour of the day (genuine reset)
+                is_midnight_window = datetime.datetime.now().hour == 0
+
+                if found_data:
+                    if round(hp_dhw_cons, 3) >= round(previous_val, 3) or is_midnight_window:
+                        self._ariston_sensors[self._PARAM_HP_DHW_CONSUMED_TODAY][self._VALUE] = hp_dhw_cons
+                        self._ariston_sensors[self._PARAM_HP_DHW_CONSUMED_TODAY][self._ATTRIBUTES] = hp_dhw_cons_attrs
+                        self._ariston_sensors[self._PARAM_HP_DHW_CONSUMED_TODAY][self._UNITS] = self._UNIT_KWH
+                    else:
+                        self._LOGGER.debug(f"Ignoring value drop: {hp_dhw_cons} is less than {previous_val}")
             except Exception as ex:
-                self._LOGGER.warn(
-                    f'Issue handling heat pump consumed electricity for DHW, {ex}')
-                self._reset_sensor(self._PARAM_HP_DHW_CONSUMED_TODAY)
+                self._LOGGER.warning(f'Issue handling heat pump consumed electricity for DHW, {ex}')
 
             # Compute COP sensors (Coefficient of Performance = Produced / Consumed)
             try:
