@@ -55,6 +55,8 @@ from .const import (
     PARAM_HP_DHW_PRODUCED_TODAY,
     PARAM_HP_CH_CONSUMED_TODAY,
     PARAM_HP_DHW_CONSUMED_TODAY,
+    CONF_HP_SLOT_MODE,
+    HP_SLOT_MODE_SPLIT,
 )
 from .sensor import sensors_default
 from .switch import switches_default
@@ -72,8 +74,6 @@ _HP_STATS_PARAMS = (
     PARAM_HP_DHW_PRODUCED_TODAY,
     PARAM_HP_CH_CONSUMED_TODAY,
     PARAM_HP_DHW_CONSUMED_TODAY,
-    CONF_HP_SLOT_MODE,
-    HP_SLOT_MODE_SPLIT,
 )
 
 PLATFORMS = [
