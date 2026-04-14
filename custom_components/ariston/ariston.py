@@ -1066,7 +1066,11 @@ class AristonHandler:
 
             try:
                 # 1. Store the previous value to compare
-                previous_val = self._ariston_sensors[self._PARAM_HP_CH_CONSUMED_TODAY].get(self._VALUE, 0)
+                raw_previous_val = self._ariston_sensors[self._PARAM_HP_CH_CONSUMED_TODAY].get(self._VALUE)
+                try:
+                    previous_val = float(raw_previous_val) if raw_previous_val is not None else 0.0
+                except (TypeError, ValueError):
+                    previous_val = 0.0
     
                 hp_ch_cons = 0
                 hp_ch_cons_attrs = {}
@@ -1104,7 +1108,11 @@ class AristonHandler:
             try:
                 # Find CurrentDay ConsumedElectricity for DHW
                 # 1. Store the previous value to compare
-                previous_val = self._ariston_sensors[self._PARAM_HP_DHW_CONSUMED_TODAY].get(self._VALUE, 0)
+                raw_previous_val = self._ariston_sensors[self._PARAM_HP_DHW_CONSUMED_TODAY].get(self._VALUE)
+                try:
+                    previous_val = float(raw_previous_val) if raw_previous_val is not None else 0.0
+                except (TypeError, ValueError):
+                    previous_val = 0.0
                 hp_dhw_cons = 0
                 hp_dhw_cons_attrs = {}
                 found_data = False
