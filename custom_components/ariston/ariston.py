@@ -1018,51 +1018,83 @@ class AristonHandler:
                     'asKwhRaw', {}).get('histogramData', [])
 
                 # Find CurrentDay ProducedEnergy for Heating
+                raw_previous_val = self._ariston_sensors[self._PARAM_HP_CH_PRODUCED_TODAY].get(self._VALUE)
+                try:
+                    previous_val = float(raw_previous_val) if raw_previous_val is not None else 0.0
+                except (TypeError, ValueError):
+                    previous_val = 0.0
+
                 hp_ch_energy = 0
                 hp_ch_attrs = {}
+                found_data = False
                 for item in histogram_data:
                     if (item.get('tab') == 'ProducedEnergy' and
                         item.get('period') == 'CurrentDay' and
                             item.get('series') == 'Heating'):
-                        for data_point in item.get('items', []):
-                            hp_ch_energy += data_point.get('y', 0)
-                            hp_ch_attrs[data_point.get(
-                                'x', '')] = data_point.get('y', 0)
+                        data_points = item.get('items', [])
+                        if data_points:
+                            found_data = True
+                            for data_point in data_points:
+                                hp_ch_energy += data_point.get('y', 0)
+                                hp_ch_attrs[data_point.get(
+                                    'x', '')] = data_point.get('y', 0)
                         break
 
-                self._ariston_sensors[self._PARAM_HP_CH_PRODUCED_TODAY][self._VALUE] = hp_ch_energy
-                self._ariston_sensors[self._PARAM_HP_CH_PRODUCED_TODAY][self._ATTRIBUTES] = hp_ch_attrs
-                self._ariston_sensors[self._PARAM_HP_CH_PRODUCED_TODAY][self._UNITS] = self._UNIT_KWH
-                self._LOGGER.debug(
-                    f"HP ProducedEnergy Heating today: total={hp_ch_energy} kWh; slots={len(hp_ch_attrs)}")
+                is_midnight_window = datetime.datetime.now().hour == 0
+
+                if found_data:
+                    if round(hp_ch_energy, 3) >= round(previous_val, 3) or is_midnight_window:
+                        self._ariston_sensors[self._PARAM_HP_CH_PRODUCED_TODAY][self._VALUE] = hp_ch_energy
+                        self._ariston_sensors[self._PARAM_HP_CH_PRODUCED_TODAY][self._ATTRIBUTES] = hp_ch_attrs
+                        self._ariston_sensors[self._PARAM_HP_CH_PRODUCED_TODAY][self._UNITS] = self._UNIT_KWH
+                        self._LOGGER.debug(
+                            f"HP ProducedEnergy Heating today: total={hp_ch_energy} kWh; slots={len(hp_ch_attrs)}")
+                    else:
+                        self._LOGGER.debug(f"Ignoring value drop: {hp_ch_energy} is less than {previous_val}")
             except Exception as ex:
-                self._LOGGER.warn(
+                self._LOGGER.warning(
                     f'Issue handling heat pump produced energy for CH, {ex}')
-                self._reset_sensor(self._PARAM_HP_CH_PRODUCED_TODAY)
+                # NEVER call self._reset_sensor here; it forces the value to 0 and causes a spike
 
             try:
                 # Find CurrentDay ProducedEnergy for DHW
+                raw_previous_val = self._ariston_sensors[self._PARAM_HP_DHW_PRODUCED_TODAY].get(self._VALUE)
+                try:
+                    previous_val = float(raw_previous_val) if raw_previous_val is not None else 0.0
+                except (TypeError, ValueError):
+                    previous_val = 0.0
+
                 hp_dhw_energy = 0
                 hp_dhw_attrs = {}
+                found_data = False
                 for item in histogram_data:
                     if (item.get('tab') == 'ProducedEnergy' and
                         item.get('period') == 'CurrentDay' and
                             item.get('series') == 'Dhw'):
-                        for data_point in item.get('items', []):
-                            hp_dhw_energy += data_point.get('y', 0)
-                            hp_dhw_attrs[data_point.get(
-                                'x', '')] = data_point.get('y', 0)
+                        data_points = item.get('items', [])
+                        if data_points:
+                            found_data = True
+                            for data_point in data_points:
+                                hp_dhw_energy += data_point.get('y', 0)
+                                hp_dhw_attrs[data_point.get(
+                                    'x', '')] = data_point.get('y', 0)
                         break
 
-                self._ariston_sensors[self._PARAM_HP_DHW_PRODUCED_TODAY][self._VALUE] = hp_dhw_energy
-                self._ariston_sensors[self._PARAM_HP_DHW_PRODUCED_TODAY][self._ATTRIBUTES] = hp_dhw_attrs
-                self._ariston_sensors[self._PARAM_HP_DHW_PRODUCED_TODAY][self._UNITS] = self._UNIT_KWH
-                self._LOGGER.debug(
-                    f"HP ProducedEnergy DHW today: total={hp_dhw_energy} kWh; slots={len(hp_dhw_attrs)}")
+                is_midnight_window = datetime.datetime.now().hour == 0
+
+                if found_data:
+                    if round(hp_dhw_energy, 3) >= round(previous_val, 3) or is_midnight_window:
+                        self._ariston_sensors[self._PARAM_HP_DHW_PRODUCED_TODAY][self._VALUE] = hp_dhw_energy
+                        self._ariston_sensors[self._PARAM_HP_DHW_PRODUCED_TODAY][self._ATTRIBUTES] = hp_dhw_attrs
+                        self._ariston_sensors[self._PARAM_HP_DHW_PRODUCED_TODAY][self._UNITS] = self._UNIT_KWH
+                        self._LOGGER.debug(
+                            f"HP ProducedEnergy DHW today: total={hp_dhw_energy} kWh; slots={len(hp_dhw_attrs)}")
+                    else:
+                        self._LOGGER.debug(f"Ignoring value drop: {hp_dhw_energy} is less than {previous_val}")
             except Exception as ex:
-                self._LOGGER.warn(
+                self._LOGGER.warning(
                     f'Issue handling heat pump produced energy for DHW, {ex}')
-                self._reset_sensor(self._PARAM_HP_DHW_PRODUCED_TODAY)
+                # NEVER call self._reset_sensor here; it forces the value to 0 and causes a spike
 
             try:
                 # 1. Store the previous value to compare
