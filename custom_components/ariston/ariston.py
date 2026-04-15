@@ -1043,10 +1043,12 @@ class AristonHandler:
                 is_midnight_window = datetime.datetime.now().hour == 0
 
                 if found_data:
+                    # Always update attributes so the stats import subscriber sees new slots.
+                    # Only gate the VALUE update to avoid a suspicious total drop.
+                    self._ariston_sensors[self._PARAM_HP_CH_PRODUCED_TODAY][self._ATTRIBUTES] = hp_ch_attrs
+                    self._ariston_sensors[self._PARAM_HP_CH_PRODUCED_TODAY][self._UNITS] = self._UNIT_KWH
                     if round(hp_ch_energy, 3) >= round(previous_val, 3) or is_midnight_window:
                         self._ariston_sensors[self._PARAM_HP_CH_PRODUCED_TODAY][self._VALUE] = hp_ch_energy
-                        self._ariston_sensors[self._PARAM_HP_CH_PRODUCED_TODAY][self._ATTRIBUTES] = hp_ch_attrs
-                        self._ariston_sensors[self._PARAM_HP_CH_PRODUCED_TODAY][self._UNITS] = self._UNIT_KWH
                         self._LOGGER.debug(
                             f"HP ProducedEnergy Heating today: total={hp_ch_energy} kWh; slots={len(hp_ch_attrs)}")
                     else:
@@ -1083,10 +1085,12 @@ class AristonHandler:
                 is_midnight_window = datetime.datetime.now().hour == 0
 
                 if found_data:
+                    # Always update attributes so the stats import subscriber sees new slots.
+                    # Only gate the VALUE update to avoid a suspicious total drop.
+                    self._ariston_sensors[self._PARAM_HP_DHW_PRODUCED_TODAY][self._ATTRIBUTES] = hp_dhw_attrs
+                    self._ariston_sensors[self._PARAM_HP_DHW_PRODUCED_TODAY][self._UNITS] = self._UNIT_KWH
                     if round(hp_dhw_energy, 3) >= round(previous_val, 3) or is_midnight_window:
                         self._ariston_sensors[self._PARAM_HP_DHW_PRODUCED_TODAY][self._VALUE] = hp_dhw_energy
-                        self._ariston_sensors[self._PARAM_HP_DHW_PRODUCED_TODAY][self._ATTRIBUTES] = hp_dhw_attrs
-                        self._ariston_sensors[self._PARAM_HP_DHW_PRODUCED_TODAY][self._UNITS] = self._UNIT_KWH
                         self._LOGGER.debug(
                             f"HP ProducedEnergy DHW today: total={hp_dhw_energy} kWh; slots={len(hp_dhw_attrs)}")
                     else:
@@ -1126,10 +1130,12 @@ class AristonHandler:
                 is_midnight_window = datetime.datetime.now().hour == 0
 
                 if found_data:
+                    # Always update attributes so the stats import subscriber sees new slots.
+                    # Only gate the VALUE update to avoid a suspicious total drop.
+                    self._ariston_sensors[self._PARAM_HP_CH_CONSUMED_TODAY][self._ATTRIBUTES] = hp_ch_cons_attrs
+                    self._ariston_sensors[self._PARAM_HP_CH_CONSUMED_TODAY][self._UNITS] = self._UNIT_KWH
                     if round(hp_ch_cons, 3) >= round(previous_val, 3) or is_midnight_window:
                         self._ariston_sensors[self._PARAM_HP_CH_CONSUMED_TODAY][self._VALUE] = hp_ch_cons
-                        self._ariston_sensors[self._PARAM_HP_CH_CONSUMED_TODAY][self._ATTRIBUTES] = hp_ch_cons_attrs
-                        self._ariston_sensors[self._PARAM_HP_CH_CONSUMED_TODAY][self._UNITS] = self._UNIT_KWH
                     else:
                         self._LOGGER.debug(f"Ignoring value drop: {hp_ch_cons} is less than {previous_val}")
     
@@ -1167,10 +1173,12 @@ class AristonHandler:
                 is_midnight_window = datetime.datetime.now().hour == 0
 
                 if found_data:
+                    # Always update attributes so the stats import subscriber sees new slots.
+                    # Only gate the VALUE update to avoid a suspicious total drop.
+                    self._ariston_sensors[self._PARAM_HP_DHW_CONSUMED_TODAY][self._ATTRIBUTES] = hp_dhw_cons_attrs
+                    self._ariston_sensors[self._PARAM_HP_DHW_CONSUMED_TODAY][self._UNITS] = self._UNIT_KWH
                     if round(hp_dhw_cons, 3) >= round(previous_val, 3) or is_midnight_window:
                         self._ariston_sensors[self._PARAM_HP_DHW_CONSUMED_TODAY][self._VALUE] = hp_dhw_cons
-                        self._ariston_sensors[self._PARAM_HP_DHW_CONSUMED_TODAY][self._ATTRIBUTES] = hp_dhw_cons_attrs
-                        self._ariston_sensors[self._PARAM_HP_DHW_CONSUMED_TODAY][self._UNITS] = self._UNIT_KWH
                     else:
                         self._LOGGER.debug(f"Ignoring value drop: {hp_dhw_cons} is less than {previous_val}")
             except Exception as ex:

@@ -103,7 +103,7 @@ class AristonApiClient:
         """Fetch bus errors."""
         resp = self.request_get(
             url=f'{self._ARISTON_URL}/api/v2/busErrors?gatewayId={plant_id}&blockingOnly=False&culture=en-US',
-            timeout=self._TIMEOUT_AV,
+            timeout=self._TIMEOUT_MAX,
             error_msg="Errors read"
         )
         return resp
