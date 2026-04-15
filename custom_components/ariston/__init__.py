@@ -116,13 +116,7 @@ def _parse_slot_start_from_range(slot_label: str, now: Optional[datetime] = None
 
     if now is None:
         now = dt_util.now()
-    start_dt = now.replace(hour=start_hour, minute=0, second=0, microsecond=0)
-
-    # If the slot start is in the future it belongs to the previous day.
-    if start_dt > now:
-        start_dt -= timedelta(days=1)
-
-    return start_dt
+    return now.replace(hour=start_hour, minute=0, second=0, microsecond=0)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
@@ -268,6 +262,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                     slot_start = _parse_slot_start_from_range(key, now)
                     if slot_start is None:
                         continue
+
+                    # Ignore slots that have not fully elapsed yet.
+                    # Ariston slots are 2-hour buckets.
+                    slot_end = slot_start + timedelta(hours=2)
+                    if slot_end > now:
+                        continue
+
                     try:
                         slot_value = float(raw_value)
                     except (TypeError, ValueError):
