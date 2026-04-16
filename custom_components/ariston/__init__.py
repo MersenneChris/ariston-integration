@@ -245,20 +245,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                         dt_val = s if hasattr(s, "isoformat") else datetime.fromtimestamp(ts, tz=dt_util.DEFAULT_TIME_ZONE)
                         imported_starts.add(dt_val.isoformat())
 
-            # Seed the running sum from the most recent DB entry (not just pre-midnight),
-            # so new slots are appended onto the correct cumulative total.
+            # Seed the running sum defensively for restart resilience.
+            # A transient malformed row can occasionally appear around restart with a
+            # lower sum than previously imported points. Using the maximum seen sum
+            # keeps the cumulative baseline monotonic and prevents negative jumps.
             valid_entries = [e for e in entries if _entry_ts(e) != float("inf") and e.get("sum") is not None]
             if not valid_entries:
                 return 0.0
 
             valid_entries.sort(key=_entry_ts, reverse=True)
             latest_sum = float(valid_entries[0].get("sum") or 0.0)
+            max_sum = max(float(e.get("sum") or 0.0) for e in valid_entries)
+            if latest_sum < max_sum:
+                _LOGGER.warning(
+                    "Detected non-monotonic statistics for %s after restart: latest_sum=%.6f < max_sum=%.6f; using max_sum",
+                    statistic_id,
+                    latest_sum,
+                    max_sum,
+                )
             _LOGGER.debug(
-                "DB state for %s: latest_sum=%.6f, today_slots_already_imported=%d",
-                statistic_id, latest_sum,
+                "DB state for %s: latest_sum=%.6f, max_sum=%.6f, today_slots_already_imported=%d",
+                statistic_id, latest_sum, max_sum,
                 sum(1 for e in entries if _entry_ts(e) >= today_midnight_ts),
             )
-            return latest_sum
+            return max_sum
 
         async def _async_import_hp_slot_statistics(changed_data: dict):
             if "recorder" not in hass.config.components:
