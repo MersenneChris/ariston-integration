@@ -310,8 +310,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 stats_payload = []
                 for slot_start, slot_value in slot_points:
                     slot_key = slot_start.isoformat()
-                    if slot_key in imported_starts:
-                        continue
 
                     if hp_slot_mode == HP_SLOT_MODE_SPLIT:
                         # Divide the 2-hour bucket evenly across two 1-hour records.
@@ -335,6 +333,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                             )
                     else:
                         # Verbatim: one record at the slot start with the full value.
+                        if slot_key in imported_starts:
+                            continue
                         running_sum_by_stat_id[statistic_id] = round(
                             running_sum_by_stat_id[statistic_id] + slot_value,
                             6,
