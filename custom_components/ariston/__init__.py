@@ -199,9 +199,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             """Seed running sum and already-imported starts from the recorder DB.
 
             Queried directly from the recorder DB so the state survives HA restarts.
-            Returns the latest cumulative sum to continue appending from.
-            Also populates imported_slots_by_stat_id with today's already-written
-            slot starts to prevent double-importing on restart.
+            Returns the cumulative baseline from before today's midnight so today's
+            elapsed slots can be rebuilt deterministically after restart.
+
+            We intentionally do NOT pre-mark today's DB rows as imported because
+            recorder may have written provisional hourly rows for an open 2-hour
+            slot (for example 10:00 before 10-12 is closed). If we pre-mark those
+            starts, the importer cannot overwrite them when the real slot value
+            arrives, leaving stale state/sum rows.
 
             Falls back to 0.0 when no prior data exists (first-ever run).
 
@@ -234,41 +239,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                     return float("inf")
                 return s.timestamp() if hasattr(s, "timestamp") else float(s)
 
-            # Hydrate imported_slots_by_stat_id with today's already-written slots
-            # so they are not re-imported after an HA restart.
-            imported_starts = imported_slots_by_stat_id.setdefault(statistic_id, set())
-            for entry in entries:
-                ts = _entry_ts(entry)
-                if ts >= today_midnight_ts and ts != float("inf"):
-                    s = entry.get("start")
-                    if s is not None:
-                        dt_val = s if hasattr(s, "isoformat") else datetime.fromtimestamp(ts, tz=dt_util.DEFAULT_TIME_ZONE)
-                        imported_starts.add(dt_val.isoformat())
-
-            # Seed the running sum defensively for restart resilience.
-            # A transient malformed row can occasionally appear around restart with a
-            # lower sum than previously imported points. Using the maximum seen sum
-            # keeps the cumulative baseline monotonic and prevents negative jumps.
+            # Seed baseline from the latest entry BEFORE local midnight so today's
+            # rows are always recomputed from a stable pre-day anchor.
             valid_entries = [e for e in entries if _entry_ts(e) != float("inf") and e.get("sum") is not None]
             if not valid_entries:
                 return 0.0
 
-            valid_entries.sort(key=_entry_ts, reverse=True)
-            latest_sum = float(valid_entries[0].get("sum") or 0.0)
-            max_sum = max(float(e.get("sum") or 0.0) for e in valid_entries)
-            if latest_sum < max_sum:
-                _LOGGER.warning(
-                    "Detected non-monotonic statistics for %s after restart: latest_sum=%.6f < max_sum=%.6f; using max_sum",
-                    statistic_id,
-                    latest_sum,
-                    max_sum,
-                )
+            previous_day_entries = [e for e in valid_entries if _entry_ts(e) < today_midnight_ts]
+            baseline_sum = 0.0
+            if previous_day_entries:
+                previous_day_entries.sort(key=_entry_ts, reverse=True)
+                baseline_sum = float(previous_day_entries[0].get("sum") or 0.0)
+
+            latest_sum = float(max(valid_entries, key=_entry_ts).get("sum") or 0.0)
+            today_rows = sum(1 for e in valid_entries if _entry_ts(e) >= today_midnight_ts)
             _LOGGER.debug(
-                "DB state for %s: latest_sum=%.6f, max_sum=%.6f, today_slots_already_imported=%d",
-                statistic_id, latest_sum, max_sum,
-                sum(1 for e in entries if _entry_ts(e) >= today_midnight_ts),
+                "DB baseline for %s: baseline_pre_midnight=%.6f, latest_sum_any_day=%.6f, existing_today_rows=%d",
+                statistic_id,
+                baseline_sum,
+                latest_sum,
+                today_rows,
             )
-            return max_sum
+            return baseline_sum
 
         async def _async_import_hp_slot_statistics(changed_data: dict):
             if "recorder" not in hass.config.components:
