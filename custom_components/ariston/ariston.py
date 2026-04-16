@@ -102,6 +102,10 @@ class AristonHandler:
     _PARAM_HP_DHW_PRODUCED_TODAY = 'hp_dhw_produced_today'
     _PARAM_HP_CH_CONSUMED_TODAY = 'hp_ch_consumed_today'
     _PARAM_HP_DHW_CONSUMED_TODAY = 'hp_dhw_consumed_today'
+    _PARAM_HP_CH_PRODUCED_LIFETIME = 'hp_ch_produced_lifetime'
+    _PARAM_HP_DHW_PRODUCED_LIFETIME = 'hp_dhw_produced_lifetime'
+    _PARAM_HP_CH_CONSUMED_LIFETIME = 'hp_ch_consumed_lifetime'
+    _PARAM_HP_DHW_CONSUMED_LIFETIME = 'hp_dhw_consumed_lifetime'
     _PARAM_HP_CH_COP = 'hp_ch_cop'
     _PARAM_HP_DHW_COP = 'hp_dhw_cop'
     _PARAM_HP_TOTAL_PRODUCED_TODAY = 'hp_total_produced_today'
@@ -249,6 +253,10 @@ class AristonHandler:
         _PARAM_HP_DHW_PRODUCED_TODAY,
         _PARAM_HP_CH_CONSUMED_TODAY,
         _PARAM_HP_DHW_CONSUMED_TODAY,
+        _PARAM_HP_CH_PRODUCED_LIFETIME,
+        _PARAM_HP_DHW_PRODUCED_LIFETIME,
+        _PARAM_HP_CH_CONSUMED_LIFETIME,
+        _PARAM_HP_DHW_CONSUMED_LIFETIME,
         _PARAM_HP_CH_COP,
         _PARAM_HP_DHW_COP,
         _PARAM_HP_TOTAL_PRODUCED_TODAY,
@@ -1305,6 +1313,18 @@ class AristonHandler:
             except Exception as ex:
                 self._LOGGER.warn(f'Issue computing HP total COP, {ex}')
                 self._reset_sensor(self._PARAM_HP_TOTAL_COP)
+
+            # Lifetime entities are statistics-only anchors for importer-owned
+            # backfilled long-term data; keep their runtime state stable.
+            for lifetime_param in (
+                self._PARAM_HP_CH_PRODUCED_LIFETIME,
+                self._PARAM_HP_DHW_PRODUCED_LIFETIME,
+                self._PARAM_HP_CH_CONSUMED_LIFETIME,
+                self._PARAM_HP_DHW_CONSUMED_LIFETIME,
+            ):
+                if self._ariston_sensors[lifetime_param][self._VALUE] is None:
+                    self._ariston_sensors[lifetime_param][self._VALUE] = 0
+                self._ariston_sensors[lifetime_param][self._UNITS] = self._UNIT_KWH
 
         self._subscribers_sensors_inform()
 

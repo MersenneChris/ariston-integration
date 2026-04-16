@@ -14,7 +14,6 @@ from homeassistant.const import (
     CONF_USERNAME,
     Platform,
 )
-from homeassistant.components import persistent_notification
 
 try:
     from homeassistant.components.recorder.statistics import async_import_statistics, get_last_statistics
@@ -56,6 +55,10 @@ from .const import (
     PARAM_HP_DHW_PRODUCED_TODAY,
     PARAM_HP_CH_CONSUMED_TODAY,
     PARAM_HP_DHW_CONSUMED_TODAY,
+    PARAM_HP_CH_PRODUCED_LIFETIME,
+    PARAM_HP_DHW_PRODUCED_LIFETIME,
+    PARAM_HP_CH_CONSUMED_LIFETIME,
+    PARAM_HP_DHW_CONSUMED_LIFETIME,
     CONF_HP_SLOT_MODE,
     HP_SLOT_MODE_SPLIT,
 )
@@ -76,6 +79,13 @@ _HP_STATS_PARAMS = (
     PARAM_HP_CH_CONSUMED_TODAY,
     PARAM_HP_DHW_CONSUMED_TODAY,
 )
+
+_HP_STATS_TARGET_PARAM = {
+    PARAM_HP_CH_PRODUCED_TODAY: PARAM_HP_CH_PRODUCED_LIFETIME,
+    PARAM_HP_DHW_PRODUCED_TODAY: PARAM_HP_DHW_PRODUCED_LIFETIME,
+    PARAM_HP_CH_CONSUMED_TODAY: PARAM_HP_CH_CONSUMED_LIFETIME,
+    PARAM_HP_DHW_CONSUMED_TODAY: PARAM_HP_DHW_CONSUMED_LIFETIME,
+}
 
 PLATFORMS = [
     Platform.CLIMATE,
@@ -196,40 +206,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             sensor_name = sensors_default[sensor_param][0]
             return f"sensor.{slugify(f'{name} {sensor_name}')}"
 
-        def _warn_if_missing_recorder_exclusions() -> None:
-            """Warn when HP statistics entities are not explicitly recorder-excluded.
-
-            With TOTAL_INCREASING HP entities, recorder can auto-generate hourly
-            statistics. This integration also imports slot-attributed statistics for
-            the same statistic IDs. Explicit recorder exclusion avoids two writers.
-            """
-            required_entities = sorted(_statistic_id_from_param(p) for p in _HP_STATS_PARAMS)
-            recorder_cfg = hass.config.as_dict().get("recorder", {})
-            excluded = set((recorder_cfg.get("exclude", {}) or {}).get("entities", []) or [])
-            missing = [entity_id for entity_id in required_entities if entity_id not in excluded]
-            if not missing:
-                return
-
-            missing_text = "\n".join(f"- {entity_id}" for entity_id in missing)
-            warning_msg = (
-                "Recorder exclusion missing for Ariston HP statistics entities. "
-                "This can cause conflicting statistics writes (recorder + importer). "
-                "Add these entity IDs under recorder.exclude.entities:\n"
-                f"{missing_text}"
-            )
-            _LOGGER.warning(warning_msg)
-
-            try:
-                persistent_notification.async_create(
-                    hass,
-                    warning_msg,
-                    title="Ariston recorder exclusions recommended",
-                    notification_id=f"{DOMAIN}_recorder_exclusions_{slugify(name)}",
-                )
-            except Exception:  # noqa: BLE001
-                # Keep startup resilient even if persistent notifications are unavailable.
-                pass
-
         async def _init_stat_state(statistic_id: str) -> float:
             """Seed running sum and already-imported starts from the recorder DB.
 
@@ -338,7 +314,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
                 slot_points.sort(key=lambda item: item[0])
 
-                statistic_id = _statistic_id_from_param(sensor_param)
+                statistic_id = _statistic_id_from_param(
+                    _HP_STATS_TARGET_PARAM.get(sensor_param, sensor_param)
+                )
                 imported_starts = imported_slots_by_stat_id.setdefault(statistic_id, set())
 
                 if statistic_id not in running_sum_by_stat_id:
@@ -405,7 +383,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             )
 
         api.ariston_api.subscribe_sensors(_schedule_hp_statistics_import)
-        _warn_if_missing_recorder_exclusions()
     else:
         _LOGGER.warning("Recorder statistics helpers are unavailable; HP slot LTS import is disabled")
 
