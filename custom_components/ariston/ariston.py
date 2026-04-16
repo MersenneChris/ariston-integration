@@ -1033,11 +1033,22 @@ class AristonHandler:
                             item.get('series') == 'Heating'):
                         data_points = item.get('items', [])
                         if data_points:
-                            found_data = True
                             for data_point in data_points:
-                                hp_ch_energy += data_point.get('y', 0)
-                                hp_ch_attrs[data_point.get(
-                                    'x', '')] = data_point.get('y', 0)
+                                raw_point = data_point.get('y', 0)
+                                try:
+                                    point_val = float(raw_point)
+                                except (TypeError, ValueError):
+                                    continue
+                                if point_val < 0:
+                                    self._LOGGER.debug(
+                                        "Ignoring negative ProducedEnergy Heating slot %s=%s",
+                                        data_point.get('x', ''),
+                                        raw_point,
+                                    )
+                                    continue
+                                found_data = True
+                                hp_ch_energy += point_val
+                                hp_ch_attrs[data_point.get('x', '')] = point_val
                         break
 
                 is_midnight_window = datetime.datetime.now().hour == 0
@@ -1075,11 +1086,22 @@ class AristonHandler:
                             item.get('series') == 'Dhw'):
                         data_points = item.get('items', [])
                         if data_points:
-                            found_data = True
                             for data_point in data_points:
-                                hp_dhw_energy += data_point.get('y', 0)
-                                hp_dhw_attrs[data_point.get(
-                                    'x', '')] = data_point.get('y', 0)
+                                raw_point = data_point.get('y', 0)
+                                try:
+                                    point_val = float(raw_point)
+                                except (TypeError, ValueError):
+                                    continue
+                                if point_val < 0:
+                                    self._LOGGER.debug(
+                                        "Ignoring negative ProducedEnergy DHW slot %s=%s",
+                                        data_point.get('x', ''),
+                                        raw_point,
+                                    )
+                                    continue
+                                found_data = True
+                                hp_dhw_energy += point_val
+                                hp_dhw_attrs[data_point.get('x', '')] = point_val
                         break
 
                 is_midnight_window = datetime.datetime.now().hour == 0
@@ -1119,10 +1141,22 @@ class AristonHandler:
             
                         data_points = item.get('items', [])
                         if data_points:
-                            found_data = True
                             for data_point in data_points:
-                                hp_ch_cons += data_point.get('y', 0)
-                                hp_ch_cons_attrs[data_point.get('x', '')] = data_point.get('y', 0)
+                                raw_point = data_point.get('y', 0)
+                                try:
+                                    point_val = float(raw_point)
+                                except (TypeError, ValueError):
+                                    continue
+                                if point_val < 0:
+                                    self._LOGGER.debug(
+                                        "Ignoring negative ConsumedElectricity Heating slot %s=%s",
+                                        data_point.get('x', ''),
+                                        raw_point,
+                                    )
+                                    continue
+                                found_data = True
+                                hp_ch_cons += point_val
+                                hp_ch_cons_attrs[data_point.get('x', '')] = point_val
                         break
 
                 # 2. Logic Guard: Only update if we found data AND it's not a suspicious drop
@@ -1161,11 +1195,22 @@ class AristonHandler:
                             item.get('series') == 'Dhw'):
                         data_points = item.get('items', [])
                         if data_points:
-                            found_data = True
                             for data_point in data_points:
-                                hp_dhw_cons += data_point.get('y', 0)
-                                hp_dhw_cons_attrs[data_point.get(
-                                    'x', '')] = data_point.get('y', 0)
+                                raw_point = data_point.get('y', 0)
+                                try:
+                                    point_val = float(raw_point)
+                                except (TypeError, ValueError):
+                                    continue
+                                if point_val < 0:
+                                    self._LOGGER.debug(
+                                        "Ignoring negative ConsumedElectricity DHW slot %s=%s",
+                                        data_point.get('x', ''),
+                                        raw_point,
+                                    )
+                                    continue
+                                found_data = True
+                                hp_dhw_cons += point_val
+                                hp_dhw_cons_attrs[data_point.get('x', '')] = point_val
                         break
 
                 # 2. Logic Guard: Only update if we found data AND it's not a suspicious drop

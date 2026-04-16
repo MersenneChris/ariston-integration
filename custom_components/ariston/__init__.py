@@ -119,6 +119,25 @@ def _parse_slot_start_from_range(slot_label: str, now: Optional[datetime] = None
     return now.replace(hour=start_hour, minute=0, second=0, microsecond=0)
 
 
+def _slot_start_from_index_or_label(slot_index: int, slot_label: str, now: Optional[datetime] = None) -> Optional[datetime]:
+    """Resolve a 2-hour slot start datetime using API order first, label second.
+
+    Ariston returns CurrentDay slot arrays in chronological order from midnight,
+    and labels can be ambiguous around 12 AM/PM. Using the slot index avoids
+    label ambiguity and prevents off-by-2h placement in recorder statistics.
+    """
+    if now is None:
+        now = dt_util.now()
+
+    # Primary mapping: position 0..11 -> 00, 02, ..., 22 local hour.
+    if isinstance(slot_index, int) and 0 <= slot_index <= 11:
+        start_hour = slot_index * 2
+        return now.replace(hour=start_hour, minute=0, second=0, microsecond=0)
+
+    # Fallback for unexpected payload shapes.
+    return _parse_slot_start_from_range(slot_label, now)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Set up Ariston from a config entry."""
     hass.data.setdefault(DATA_ARISTON, {DEVICES: {}})
@@ -258,8 +277,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
                 now = dt_util.now()
                 slot_points = []
-                for key, raw_value in attributes.items():
-                    slot_start = _parse_slot_start_from_range(key, now)
+                for slot_index, (key, raw_value) in enumerate(attributes.items()):
+                    slot_start = _slot_start_from_index_or_label(slot_index, key, now)
                     if slot_start is None:
                         continue
 
