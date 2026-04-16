@@ -1016,6 +1016,7 @@ class AristonHandler:
                 # Extract ProducedEnergy data from asKwhRaw.histogramData
                 histogram_data = self._hp_energy_data.get('data', {}).get(
                     'asKwhRaw', {}).get('histogramData', [])
+                elapsed_slot_count = datetime.datetime.now().hour // 2
 
                 # Find CurrentDay ProducedEnergy for Heating
                 raw_previous_val = self._ariston_sensors[self._PARAM_HP_CH_PRODUCED_TODAY].get(self._VALUE)
@@ -1033,7 +1034,7 @@ class AristonHandler:
                             item.get('series') == 'Heating'):
                         data_points = item.get('items', [])
                         if data_points:
-                            for data_point in data_points:
+                            for slot_idx, data_point in enumerate(data_points):
                                 raw_point = data_point.get('y', 0)
                                 try:
                                     point_val = float(raw_point)
@@ -1047,8 +1048,9 @@ class AristonHandler:
                                     )
                                     continue
                                 found_data = True
-                                hp_ch_energy += point_val
                                 hp_ch_attrs[data_point.get('x', '')] = point_val
+                                if slot_idx < elapsed_slot_count:
+                                    hp_ch_energy += point_val
                         break
 
                 is_midnight_window = datetime.datetime.now().hour == 0
@@ -1086,7 +1088,7 @@ class AristonHandler:
                             item.get('series') == 'Dhw'):
                         data_points = item.get('items', [])
                         if data_points:
-                            for data_point in data_points:
+                            for slot_idx, data_point in enumerate(data_points):
                                 raw_point = data_point.get('y', 0)
                                 try:
                                     point_val = float(raw_point)
@@ -1100,8 +1102,9 @@ class AristonHandler:
                                     )
                                     continue
                                 found_data = True
-                                hp_dhw_energy += point_val
                                 hp_dhw_attrs[data_point.get('x', '')] = point_val
+                                if slot_idx < elapsed_slot_count:
+                                    hp_dhw_energy += point_val
                         break
 
                 is_midnight_window = datetime.datetime.now().hour == 0
@@ -1141,7 +1144,7 @@ class AristonHandler:
             
                         data_points = item.get('items', [])
                         if data_points:
-                            for data_point in data_points:
+                            for slot_idx, data_point in enumerate(data_points):
                                 raw_point = data_point.get('y', 0)
                                 try:
                                     point_val = float(raw_point)
@@ -1155,8 +1158,9 @@ class AristonHandler:
                                     )
                                     continue
                                 found_data = True
-                                hp_ch_cons += point_val
                                 hp_ch_cons_attrs[data_point.get('x', '')] = point_val
+                                if slot_idx < elapsed_slot_count:
+                                    hp_ch_cons += point_val
                         break
 
                 # 2. Logic Guard: Only update if we found data AND it's not a suspicious drop
@@ -1195,7 +1199,7 @@ class AristonHandler:
                             item.get('series') == 'Dhw'):
                         data_points = item.get('items', [])
                         if data_points:
-                            for data_point in data_points:
+                            for slot_idx, data_point in enumerate(data_points):
                                 raw_point = data_point.get('y', 0)
                                 try:
                                     point_val = float(raw_point)
@@ -1209,8 +1213,9 @@ class AristonHandler:
                                     )
                                     continue
                                 found_data = True
-                                hp_dhw_cons += point_val
                                 hp_dhw_cons_attrs[data_point.get('x', '')] = point_val
+                                if slot_idx < elapsed_slot_count:
+                                    hp_dhw_cons += point_val
                         break
 
                 # 2. Logic Guard: Only update if we found data AND it's not a suspicious drop
