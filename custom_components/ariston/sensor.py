@@ -313,7 +313,8 @@ class AristonSensor(SensorEntity):
         return cache.get("scop_running")
 
     def _statistic_id_from_param(self, param_name):
-        return f"sensor.{slugify(self._device_name)}_{param_name}"
+        sensor_name = SENSORS[param_name][0]
+        return f"sensor.{slugify(f'{self._device_name} {sensor_name}')}"
 
     def _safe_get_last_statistics(self, statistic_id, count):
         """Read statistics via recorder helper API (no direct SQL)."""
