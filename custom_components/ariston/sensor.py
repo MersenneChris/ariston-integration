@@ -6,6 +6,13 @@ import calendar
 
 from homeassistant.const import CONF_NAME
 from homeassistant.helpers.entity import Entity
+from homeassistant.util import slugify
+
+try:
+    from homeassistant.components.recorder.statistics import get_last_statistics
+    _RECORDER_STATS_AVAILABLE = True
+except Exception:  # pragma: no cover - HA runtime feature gate
+    _RECORDER_STATS_AVAILABLE = False
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -55,6 +62,8 @@ from .const import (
     PARAM_HP_TOTAL_PRODUCED_TODAY,
     PARAM_HP_TOTAL_CONSUMED_TODAY,
     PARAM_HP_TOTAL_COP,
+    PARAM_HP_SCOP_RUNNING,
+    PARAM_HP_SCOP_365D,
     PARAM_VERSION,
     VALUE,
     UNITS,
@@ -107,6 +116,8 @@ SENSOR_HP_DHW_COP = 'HP DHW COP'
 SENSOR_HP_TOTAL_PRODUCED_TODAY = 'HP total produced energy today'
 SENSOR_HP_TOTAL_CONSUMED_TODAY = 'HP total consumed energy today'
 SENSOR_HP_TOTAL_COP = 'HP total COP'
+SENSOR_HP_SCOP_RUNNING = 'HP SCOP running'
+SENSOR_HP_SCOP_365D = 'HP SCOP 365d'
 SENSOR_VERSION = 'Integration local version'
 
 _LOGGER = logging.getLogger(__name__)
@@ -144,13 +155,19 @@ sensors_default = {
     PARAM_HP_DHW_PRODUCED_LIFETIME: [SENSOR_HP_DHW_PRODUCED_LIFETIME, SensorDeviceClass.ENERGY, "mdi:flash", SensorStateClass.TOTAL_INCREASING],
     PARAM_HP_CH_CONSUMED_LIFETIME: [SENSOR_HP_CH_CONSUMED_LIFETIME, SensorDeviceClass.ENERGY, "mdi:flash", SensorStateClass.TOTAL_INCREASING],
     PARAM_HP_DHW_CONSUMED_LIFETIME: [SENSOR_HP_DHW_CONSUMED_LIFETIME, SensorDeviceClass.ENERGY, "mdi:flash", SensorStateClass.TOTAL_INCREASING],
-    PARAM_HP_CH_COP: [SENSOR_HP_CH_COP, SensorDeviceClass.POWER_FACTOR, "mdi:gauge", SensorStateClass.MEASUREMENT],
-    PARAM_HP_DHW_COP: [SENSOR_HP_DHW_COP, SensorDeviceClass.POWER_FACTOR, "mdi:gauge", SensorStateClass.MEASUREMENT],
+    # COP is a ratio, not electrical power factor. Keep device_class unset.
+    PARAM_HP_CH_COP: [SENSOR_HP_CH_COP, None, "mdi:gauge", SensorStateClass.MEASUREMENT],
+    PARAM_HP_DHW_COP: [SENSOR_HP_DHW_COP, None, "mdi:gauge", SensorStateClass.MEASUREMENT],
     PARAM_HP_TOTAL_PRODUCED_TODAY: [SENSOR_HP_TOTAL_PRODUCED_TODAY, SensorDeviceClass.ENERGY, "mdi:flash", SensorStateClass.MEASUREMENT],
     PARAM_HP_TOTAL_CONSUMED_TODAY: [SENSOR_HP_TOTAL_CONSUMED_TODAY, SensorDeviceClass.ENERGY, "mdi:flash", SensorStateClass.MEASUREMENT],
-    PARAM_HP_TOTAL_COP: [SENSOR_HP_TOTAL_COP, SensorDeviceClass.POWER_FACTOR, "mdi:gauge", SensorStateClass.MEASUREMENT],
+    PARAM_HP_TOTAL_COP: [SENSOR_HP_TOTAL_COP, None, "mdi:gauge", SensorStateClass.MEASUREMENT],
+    PARAM_HP_SCOP_RUNNING: [SENSOR_HP_SCOP_RUNNING, None, "mdi:chart-line", SensorStateClass.MEASUREMENT],
+    PARAM_HP_SCOP_365D: [SENSOR_HP_SCOP_365D, None, "mdi:calendar-range", SensorStateClass.MEASUREMENT],
     PARAM_VERSION: [SENSOR_VERSION, None, "mdi:package-down", None],
 }
+
+LOCAL_COMPUTED_SENSORS = {PARAM_HP_SCOP_RUNNING, PARAM_HP_SCOP_365D}
+SCOP_365_HOURLY_SAMPLES = 9000
 SENSORS = deepcopy(sensors_default)
 for param in sensors_default:
     if param in ZONED_PARAMS:
@@ -171,7 +188,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     
     # Filter sensors to only those available in the API
     api = device.api.ariston_api
-    sensors = [s for s in SENSORS.keys() if s in api.sensor_values]
+    sensors = [s for s in SENSORS.keys() if s in api.sensor_values or s in LOCAL_COMPUTED_SENSORS]
     _LOGGER.info("Adding %d sensors for %s (available in API: %d)", len(sensors), name, len(api.sensor_values))
     
     async_add_entities(
@@ -182,6 +199,8 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
 class AristonSensor(SensorEntity):
     """A sensor implementation for Ariston."""
+
+    _scop_cache_by_slug = {}
 
     def __init__(self, name, device, sensor_type):
         """Initialize a sensor for Ariston."""
@@ -224,6 +243,8 @@ class AristonSensor(SensorEntity):
     @property
     def native_unit_of_measurement(self):
         """Return unit of sensor."""
+        if self._sensor_type in LOCAL_COMPUTED_SENSORS:
+            return "COP"
         try:
             return self._api.sensor_values[self._sensor_type][UNITS]
         except KeyError:
@@ -263,6 +284,8 @@ class AristonSensor(SensorEntity):
     @property
     def unit_of_measurement(self):
         """Return the units of measurement."""
+        if self._sensor_type in LOCAL_COMPUTED_SENSORS:
+            return "COP"
         try:
             return self._api.sensor_values[self._sensor_type][UNITS]
         except KeyError:
@@ -273,15 +296,181 @@ class AristonSensor(SensorEntity):
         """Return True if entity is available."""
         if self._sensor_type == PARAM_VERSION:
             return True
+        if self._sensor_type in LOCAL_COMPUTED_SENSORS:
+            return self._state is not None
         return (
             self._api.available
             and not self._api.sensor_values[self._sensor_type][VALUE] is None
         )
 
+    def _query_scop(self, rolling_days=None):
+        """Compatibility wrapper kept for call-site simplicity."""
+        self._refresh_scop_cache_if_needed()
+        slug = slugify(self._device_name)
+        cache = self._scop_cache_by_slug.get(slug, {})
+        if rolling_days:
+            return cache.get("scop_365d")
+        return cache.get("scop_running")
+
+    def _statistic_id_from_param(self, param_name):
+        return f"sensor.{slugify(self._device_name)}_{param_name}"
+
+    def _safe_get_last_statistics(self, statistic_id, count):
+        """Read statistics via recorder helper API (no direct SQL)."""
+        if not _RECORDER_STATS_AVAILABLE or not self.hass:
+            return []
+
+        try:
+            data = get_last_statistics(self.hass, count, statistic_id, False, {"sum", "start"})
+        except TypeError:
+            # HA signature drift protection.
+            try:
+                data = get_last_statistics(self.hass, count, [statistic_id], False, {"sum", "start"})
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.debug("Recorder statistics call failed for %s: %s", statistic_id, err)
+                return []
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("Recorder statistics call failed for %s: %s", statistic_id, err)
+            return []
+
+        if not isinstance(data, dict):
+            return []
+        return data.get(statistic_id, [])
+
+    @staticmethod
+    def _sum_points(entries):
+        points = []
+        for item in entries:
+            start = item.get("start")
+            sum_val = item.get("sum")
+            if start is None or sum_val is None:
+                continue
+            try:
+                ts = start.timestamp() if hasattr(start, "timestamp") else float(start)
+                sv = float(sum_val)
+            except Exception:  # noqa: BLE001
+                continue
+            points.append((ts, sv))
+        points.sort(key=lambda x: x[0])
+        return points
+
+    @staticmethod
+    def _latest_sum(points):
+        if not points:
+            return None
+        return points[-1][1]
+
+    @staticmethod
+    def _sum_at_or_before(points, cutoff_ts):
+        """Return cumulative sum value at/before cutoff timestamp."""
+        if not points:
+            return None
+        value = None
+        for ts, sum_val in points:
+            if ts <= cutoff_ts:
+                value = sum_val
+            else:
+                break
+        return value
+
+    @staticmethod
+    def _delta_since(points, cutoff_ts):
+        """Return cumulative delta from cutoff to latest. Assumes monotonically increasing sum."""
+        if not points:
+            return None
+
+        latest = points[-1][1]
+        baseline = 0.0
+        for ts, sum_val in points:
+            if ts < cutoff_ts:
+                baseline = sum_val
+            else:
+                break
+        return latest - baseline
+
+    @staticmethod
+    def _delta_between(points, start_ts, end_ts):
+        """Return cumulative delta between two timestamps."""
+        end_val = AristonSensor._sum_at_or_before(points, end_ts)
+        if end_val is None:
+            return None
+        start_val = AristonSensor._sum_at_or_before(points, start_ts)
+        if start_val is None:
+            start_val = 0.0
+        return end_val - start_val
+
+    def _refresh_scop_cache_if_needed(self):
+        slug = slugify(self._device_name)
+        now = datetime.now()
+        local_now = now.astimezone()
+        today = local_now.date()
+        # Daily SCOP snapshot is anchored at today's local midnight, i.e. end-of-day yesterday.
+        snapshot_day_iso = today.isoformat()
+        cache = self._scop_cache_by_slug.get(slug)
+
+        # Prefer to compute during 00:00-02:00 window, but if HA was down then,
+        # allow first computation later in the day as a fallback.
+        in_window = local_now.hour < 2
+        if cache and cache.get("snapshot_day") == snapshot_day_iso:
+            return
+        if (not in_window) and cache and cache.get("snapshot_day") == snapshot_day_iso:
+            return
+
+        cutoff_dt_local = local_now.replace(
+            year=today.year,
+            month=today.month,
+            day=today.day,
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+        cutoff_ts = cutoff_dt_local.timestamp()
+        start_365_ts = (cutoff_dt_local - timedelta(days=365)).timestamp()
+
+        produced_ids = (
+            self._statistic_id_from_param(PARAM_HP_CH_PRODUCED_LIFETIME),
+            self._statistic_id_from_param(PARAM_HP_DHW_PRODUCED_LIFETIME),
+        )
+        consumed_ids = (
+            self._statistic_id_from_param(PARAM_HP_CH_CONSUMED_LIFETIME),
+            self._statistic_id_from_param(PARAM_HP_DHW_CONSUMED_LIFETIME),
+        )
+
+        # Pull enough samples to span a full rolling year at hourly cadence.
+        sample_count = SCOP_365_HOURLY_SAMPLES
+        points_by_id = {}
+        for sid in (*produced_ids, *consumed_ids):
+            entries = self._safe_get_last_statistics(sid, sample_count)
+            points_by_id[sid] = self._sum_points(entries)
+
+        produced_at_cutoff = sum(self._sum_at_or_before(points_by_id[sid], cutoff_ts) or 0.0 for sid in produced_ids)
+        consumed_at_cutoff = sum(self._sum_at_or_before(points_by_id[sid], cutoff_ts) or 0.0 for sid in consumed_ids)
+        scop_running = round(produced_at_cutoff / consumed_at_cutoff, 3) if consumed_at_cutoff > 0 else None
+
+        delta_prod = sum(self._delta_between(points_by_id[sid], start_365_ts, cutoff_ts) or 0.0 for sid in produced_ids)
+        delta_cons = sum(self._delta_between(points_by_id[sid], start_365_ts, cutoff_ts) or 0.0 for sid in consumed_ids)
+        scop_365d = round(delta_prod / delta_cons, 3) if delta_cons > 0 else None
+
+        self._scop_cache_by_slug[slug] = {
+            "updated": now,
+            "snapshot_day": snapshot_day_iso,
+            "scop_running": scop_running,
+            "scop_365d": scop_365d,
+        }
+
 
     def update(self):
         """Get the latest data and updates the state."""
         try:
+            if self._sensor_type in LOCAL_COMPUTED_SENSORS:
+                if self._sensor_type == PARAM_HP_SCOP_RUNNING:
+                    self._state = self._query_scop(rolling_days=None)
+                else:
+                    self._state = self._query_scop(rolling_days=365)
+                self._attrs = {}
+                return
+
             if self._sensor_type == PARAM_VERSION:
                 self._state = self._api.version
                 return
