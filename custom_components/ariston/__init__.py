@@ -59,6 +59,9 @@ from .const import (
     PARAM_HP_DHW_PRODUCED_LIFETIME,
     PARAM_HP_CH_CONSUMED_LIFETIME,
     PARAM_HP_DHW_CONSUMED_LIFETIME,
+    PARAM_HP_TOTAL_COP,
+    PARAM_HP_SCOP_RUNNING,
+    PARAM_HP_SCOP_365D,
     CONF_HP_SLOT_MODE,
     HP_SLOT_MODE_SPLIT,
 )
@@ -201,6 +204,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         _LOGGER.info("HP slot mode: %s", hp_slot_mode)
         imported_slots_by_stat_id = {}
         running_sum_by_stat_id = {}
+        seeded_mean_stat_ids = set()
 
         def _statistic_id_from_param(sensor_param: str) -> str:
             sensor_name = sensors_default[sensor_param][0]
@@ -376,13 +380,79 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 )
                 async_import_statistics(hass, metadata, stats_payload)
 
-        def _schedule_hp_statistics_import(changed_data, *_args, **_kwargs):
+        def _safe_float(value):
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return None
+
+        async def _async_seed_scop_metadata(_changed_data: dict):
+            """Create SCOP statistics metadata lazily via one seeded sample.
+
+            Recorder creates metadata when first statistics are imported. This
+            avoids manual SQL before running historical backfills.
+            """
+            if "recorder" not in hass.config.components:
+                return
+
+            # Seed with the currently available total COP ratio.
+            seed_value = _safe_float(api.ariston_api.sensor_values.get(PARAM_HP_TOTAL_COP, {}).get("value"))
+            if seed_value is None or seed_value <= 0:
+                return
+
+            seed_start = dt_util.as_utc(dt_util.now().replace(minute=0, second=0, microsecond=0))
+
+            for scop_param in (PARAM_HP_SCOP_RUNNING, PARAM_HP_SCOP_365D):
+                statistic_id = _statistic_id_from_param(scop_param)
+                if statistic_id in seeded_mean_stat_ids:
+                    continue
+
+                try:
+                    last_stats = await _get_recorder_instance(hass).async_add_executor_job(
+                        get_last_statistics, hass, 1, statistic_id, False, {"mean", "start"}
+                    )
+                except Exception as ex:  # noqa: BLE001
+                    _LOGGER.debug("Could not check SCOP statistics for %s: %s", statistic_id, ex)
+                    continue
+
+                if last_stats.get(statistic_id):
+                    seeded_mean_stat_ids.add(statistic_id)
+                    continue
+
+                metadata = StatisticMetaData(
+                    has_mean=True,
+                    has_sum=False,
+                    name=None,
+                    source="recorder",
+                    statistic_id=statistic_id,
+                    unit_of_measurement="COP",
+                )
+                async_import_statistics(
+                    hass,
+                    metadata,
+                    [
+                        StatisticData(
+                            start=seed_start,
+                            mean=round(seed_value, 3),
+                            min=round(seed_value, 3),
+                            max=round(seed_value, 3),
+                        )
+                    ],
+                )
+                seeded_mean_stat_ids.add(statistic_id)
+                _LOGGER.info("Seeded statistics metadata for %s", statistic_id)
+
+        def _schedule_recorder_tasks(changed_data, *_args, **_kwargs):
             hass.loop.call_soon_threadsafe(
                 hass.async_create_task,
                 _async_import_hp_slot_statistics(changed_data),
             )
+            hass.loop.call_soon_threadsafe(
+                hass.async_create_task,
+                _async_seed_scop_metadata(changed_data),
+            )
 
-        api.ariston_api.subscribe_sensors(_schedule_hp_statistics_import)
+        api.ariston_api.subscribe_sensors(_schedule_recorder_tasks)
     else:
         _LOGGER.warning("Recorder statistics helpers are unavailable; HP slot LTS import is disabled")
 
